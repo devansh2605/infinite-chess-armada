@@ -1,6 +1,9 @@
 import React from 'react';
 import axios from 'axios';
 import { browserHistory } from 'react-router';
+
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+
 import CreateGameContainer from '../../containers/home/CreateGameContainer';
 import JoinGameModalContainer from '../../containers/home/JoinGameModalContainer';
 import LoginContainer from '../../containers/home/LoginContainer';
@@ -18,11 +21,11 @@ export default class OverviewComponent extends React.Component {
 	}
 
 	componentDidMount() {
-		axios.get('/api/games/paused')
-			.then(res => this.setState({ pausedGames: res.data || [] }))
+		axios.get(BACKEND + '/api/games/paused')
+			.then(res => this.setState({ pausedGames: Array.isArray(res.data) ? res.data : [] }))
 			.catch(() => {});
-		axios.get('/api/games/history')
-			.then(res => this.setState({ recentGames: (res.data || []).slice(0, 5) }))
+		axios.get(BACKEND + '/api/games/history')
+			.then(res => this.setState({ recentGames: (Array.isArray(res.data) ? res.data : []).slice(0, 5) }))
 			.catch(() => {});
 	}
 

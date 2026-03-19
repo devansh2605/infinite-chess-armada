@@ -2,6 +2,8 @@ import axios from 'axios';
 import { browserHistory } from 'react-router';
 import { socketLobby, socketLoading } from '../socket';
 
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+
 export const UPDATE_SELECTED_GAME = 'UPDATE_SELECTED_GAME';
 export const CLEAR_SELECTED_GAME = 'CLEAR_SELECTED_GAME';
 export const UPDATE_MODAL_DISPLAYED_GAME = 'UPDATE_MODAL_DISPLAYED_GAME';
@@ -44,10 +46,12 @@ function receiveGamesInfo(data) {
 }
 
 export function createGame(postData) {
-	return dispatch => axios.post('/api/games', postData)
+	return dispatch => axios.post(BACKEND + '/api/games', postData)
 			.then(response => dispatch(updateSelectedGame(response.data)));
 }
 
 export function updateDisplayedGames() {
-	return dispatch => axios.get('/api/games/open').then(response => dispatch(receiveGamesInfo(response.data)));
+	return dispatch => axios.get(BACKEND + '/api/games/open')
+		.then(response => dispatch(receiveGamesInfo(Array.isArray(response.data) ? response.data : [])))
+		.catch(() => dispatch(receiveGamesInfo([])));
 }
