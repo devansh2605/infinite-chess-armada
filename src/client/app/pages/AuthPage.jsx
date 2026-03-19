@@ -14,6 +14,7 @@ export default class AuthPage extends Component {
 			password: '',
 			username: '',
 			confirmPassword: '',
+			guestUsername: '',
 			loading: false,
 			error: '',
 			usernameAvailable: null,
@@ -23,14 +24,13 @@ export default class AuthPage extends Component {
 	}
 
 	componentDidMount() {
-		// If already logged in, go straight to lobby
 		supabase.auth.getSession().then(({ data: { session } }) => {
 			if (session) browserHistory.push('/local');
 		});
 	}
 
-	handleUsernameChange(username) {
-		this.setState({ username, usernameAvailable: null });
+	handleUsernameChange(username, field) {
+		this.setState({ [field]: username, usernameAvailable: null });
 		clearTimeout(this._usernameTimeout);
 		if (username.length < 3) return;
 		this.setState({ checkingUsername: true });
@@ -57,6 +57,8 @@ export default class AuthPage extends Component {
 		if (profile) {
 			this.props.setUser({ ...profile, token: data.session.access_token });
 			browserHistory.push('/local');
+		} else {
+			this.setState({ loading: false, error: 'Could not load profile. Try again.' });
 		}
 		this.setState({ loading: false });
 	}
@@ -81,8 +83,7 @@ export default class AuthPage extends Component {
 			return;
 		}
 		if (data.session) {
-			// Auto-confirmed
-			await new Promise(r => setTimeout(r, 800)); // give trigger time to create profile
+			await new Promise(r => setTimeout(r, 800));
 			const profile = await this.fetchAndStoreProfile(data.session);
 			if (profile) {
 				this.props.setUser({ ...profile, token: data.session.access_token });
@@ -91,6 +92,33 @@ export default class AuthPage extends Component {
 		} else {
 			this.setState({ loading: false, error: '', tab: 'login' });
 			alert('Check your email for a confirmation link, then log in.');
+		}
+	}
+
+	async handleGuest(e) {
+		e.preventDefault();
+		const { guestUsername, usernameAvailable } = this.state;
+		if (!guestUsername || guestUsername.length < 3) return this.setState({ error: 'Username must be at least 3 characters' });
+		if (!/^[a-zA-Z0-9_]+$/.test(guestUsername)) return this.setState({ error: 'Username can only contain letters, numbers, and underscores' });
+		if (usernameAvailable === false) return this.setState({ error: 'Username is already taken' });
+		if (usernameAvailable !== true) return this.setState({ error: 'Please wait for username check to complete' });
+
+		this.setState({ loading: true, error: '' });
+		const { data, error } = await supabase.auth.signInAnonymously({
+			options: { data: { username: guestUsername } },
+		});
+		if (error) {
+			this.setState({ loading: false, error: error.message });
+			return;
+		}
+		// Give the DB trigger time to create the profile row
+		await new Promise(r => setTimeout(r, 1000));
+		const profile = await this.fetchAndStoreProfile(data.session);
+		if (profile) {
+			this.props.setUser({ ...profile, token: data.session.access_token });
+			browserHistory.push('/local');
+		} else {
+			this.setState({ loading: false, error: 'Could not create guest profile. Try again.' });
 		}
 	}
 
@@ -104,12 +132,17 @@ export default class AuthPage extends Component {
 	}
 
 	render() {
-		const { tab, email, password, username, confirmPassword, loading, error, usernameAvailable, checkingUsername } = this.state;
+		const { tab, email, password, username, guestUsername, confirmPassword, loading, error, usernameAvailable, checkingUsername } = this.state;
+
+		const tabs = [
+			{ id: 'login', label: 'Log In' },
+			{ id: 'signup', label: 'Sign Up' },
+			{ id: 'guest', label: 'Guest' },
+		];
 
 		return (
 			<div className="min-h-screen bg-bg-base flex items-center justify-center px-4">
 				<div className="w-full max-w-md">
-					{/* Logo */}
 					<div className="text-center mb-8">
 						<div className="text-3xl font-bold tracking-tight mb-1">
 							<span className="text-accent">Infinite</span>
@@ -120,17 +153,16 @@ export default class AuthPage extends Component {
 					</div>
 
 					<div className="bg-bg-card border border-border-dim rounded-xl overflow-hidden shadow-2xl">
-						{/* Tabs */}
 						<div className="flex border-b border-border-dim">
-							{['login', 'signup'].map(t => (
+							{tabs.map(t => (
 								<button
-									key={t}
-									onClick={() => this.setState({ tab: t, error: '' })}
+									key={t.id}
+									onClick={() => this.setState({ tab: t.id, error: '', usernameAvailable: null })}
 									className={`flex-1 py-3 text-sm font-semibold capitalize transition-colors ${
-										tab === t ? 'text-accent border-b-2 border-accent bg-bg-base/30' : 'text-text-dim hover:text-text-main'
+										tab === t.id ? 'text-accent border-b-2 border-accent bg-bg-base/30' : 'text-text-dim hover:text-text-main'
 									}`}
 								>
-									{t === 'login' ? 'Log In' : 'Sign Up'}
+									{t.label}
 								</button>
 							))}
 						</div>
@@ -142,7 +174,7 @@ export default class AuthPage extends Component {
 								</div>
 							)}
 
-							{tab === 'login' ? (
+							{tab === 'login' && (
 								<form onSubmit={e => this.handleLogin(e)} className="space-y-4">
 									<div>
 										<label className="block text-text-dim text-xs mb-1 font-medium">Email</label>
@@ -171,7 +203,9 @@ export default class AuthPage extends Component {
 										{loading ? 'Logging in…' : 'Log In'}
 									</button>
 								</form>
-							) : (
+							)}
+
+							{tab === 'signup' && (
 								<form onSubmit={e => this.handleSignup(e)} className="space-y-4">
 									<div>
 										<label className="block text-text-dim text-xs mb-1 font-medium">Username</label>
@@ -179,7 +213,7 @@ export default class AuthPage extends Component {
 											<input
 												type="text" required
 												value={username}
-												onChange={e => this.handleUsernameChange(e.target.value)}
+												onChange={e => this.handleUsernameChange(e.target.value, 'username')}
 												className={`w-full bg-bg-panel border rounded-lg px-3 py-2.5 text-text-main text-sm focus:outline-none transition-colors pr-8 ${
 													usernameAvailable === true ? 'border-green-500' : usernameAvailable === false ? 'border-red-500' : 'border-border-dim focus:border-accent'
 												}`}
@@ -232,15 +266,50 @@ export default class AuthPage extends Component {
 								</form>
 							)}
 
-							<p className="text-center text-text-dim text-xs mt-4">
-								{tab === 'login' ? "Don't have an account? " : 'Already have an account? '}
-								<button
-									onClick={() => this.setState({ tab: tab === 'login' ? 'signup' : 'login', error: '' })}
-									className="text-accent hover:underline"
-								>
-									{tab === 'login' ? 'Sign up' : 'Log in'}
-								</button>
-							</p>
+							{tab === 'guest' && (
+								<form onSubmit={e => this.handleGuest(e)} className="space-y-4">
+									<p className="text-text-dim text-sm">Pick a unique username to play without an account. No email or password needed.</p>
+									<div>
+										<label className="block text-text-dim text-xs mb-1 font-medium">Username</label>
+										<div className="relative">
+											<input
+												type="text" required
+												value={guestUsername}
+												onChange={e => this.handleUsernameChange(e.target.value, 'guestUsername')}
+												className={`w-full bg-bg-panel border rounded-lg px-3 py-2.5 text-text-main text-sm focus:outline-none transition-colors pr-8 ${
+													usernameAvailable === true ? 'border-green-500' : usernameAvailable === false ? 'border-red-500' : 'border-border-dim focus:border-accent-blue'
+												}`}
+												placeholder="GuestPlayer42"
+												maxLength={20}
+											/>
+											<span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs">
+												{checkingUsername ? '…' : usernameAvailable === true ? '✓' : usernameAvailable === false ? '✗' : ''}
+											</span>
+										</div>
+										{usernameAvailable === false && <p className="text-red-400 text-xs mt-1">Username taken</p>}
+										{usernameAvailable === true && <p className="text-green-400 text-xs mt-1">Username available</p>}
+									</div>
+									<button
+										type="submit" disabled={loading || usernameAvailable !== true}
+										className="w-full bg-accent-blue hover:bg-blue-400 disabled:bg-bg-panel disabled:text-text-dim text-white font-semibold py-2.5 rounded-lg transition-colors"
+									>
+										{loading ? 'Setting up…' : 'Continue as Guest'}
+									</button>
+									<p className="text-text-dim text-xs text-center">Guest sessions are temporary. Create an account to save your rating.</p>
+								</form>
+							)}
+
+							{tab !== 'guest' && (
+								<p className="text-center text-text-dim text-xs mt-4">
+									{tab === 'login' ? "Don't have an account? " : 'Already have an account? '}
+									<button
+										onClick={() => this.setState({ tab: tab === 'login' ? 'signup' : 'login', error: '' })}
+										className="text-accent hover:underline"
+									>
+										{tab === 'login' ? 'Sign up' : 'Log in'}
+									</button>
+								</p>
+							)}
 						</div>
 					</div>
 
