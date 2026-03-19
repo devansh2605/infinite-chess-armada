@@ -3,11 +3,12 @@ import axios from 'axios';
 import { browserHistory } from 'react-router';
 import GameSidebarComponent from './sidebar/GameSidebarComponent';
 import GameBoardsContainer from '../../containers/game/boards/GameBoardsContainer';
+import PostGameModal from './PostGameModal';
 
 export default class GameComponent extends React.Component {
 	constructor(props) {
 		super(props);
-		this.state = { renderGameBoards: false, resuming: false };
+		this.state = { renderGameBoards: false, resuming: false, showPostGame: false };
 		this.handleResume = this.handleResume.bind(this);
 	}
 
@@ -17,20 +18,21 @@ export default class GameComponent extends React.Component {
 
 	componentWillReceiveProps(nextProps) {
 		this.setState({ renderGameBoards: nextProps.renderGameBoards });
+		// Show post-game modal when termination arrives
+		if (nextProps.gameTermination && !this.props.gameTermination) {
+			this.setState({ showPostGame: true });
+		}
 	}
 
 	handleResume() {
 		this.setState({ resuming: true });
-		axios.post(`/api/games/resume/${this.props.gameId}`)
-			.then(() => {
-				// Re-mount by navigating to same route — re-hydrates clocks
-				browserHistory.replace(`/game/${this.props.gameId}`);
-			})
+		axios.post('/api/games/resume/' + this.props.gameId)
+			.then(() => browserHistory.replace('/game/' + this.props.gameId))
 			.catch(() => this.setState({ resuming: false }));
 	}
 
 	render() {
-		const { gamePaused } = this.props;
+		const { gamePaused, gameTermination, postGameData, game } = this.props;
 		return (
 			<div className="flex bg-bg-base min-h-screen">
 				{this.state.renderGameBoards && (
@@ -41,13 +43,9 @@ export default class GameComponent extends React.Component {
 							{gamePaused && (
 								<div style={resumeOverlayStyle}>
 									<div style={resumeCardStyle}>
-										<div style={{ marginBottom: '12px', color: '#e2e8f0', fontWeight: 'bold', fontSize: '16px' }}>Game Paused</div>
-										<button
-											style={resumeButtonStyle}
-											onClick={this.handleResume}
-											disabled={this.state.resuming}
-										>
-											{this.state.resuming ? 'Starting…' : '▶ Start Game'}
+										<div style={{ marginBottom: 12, color: '#e2e8f0', fontWeight: 'bold', fontSize: 16 }}>Game Paused</div>
+										<button style={resumeButtonStyle} onClick={this.handleResume} disabled={this.state.resuming}>
+											{this.state.resuming ? 'Starting…' : '▶ Resume'}
 										</button>
 									</div>
 								</div>
@@ -55,39 +53,19 @@ export default class GameComponent extends React.Component {
 						</div>
 					</div>
 				)}
+				{this.state.showPostGame && gameTermination && (
+					<PostGameModal
+						termination={gameTermination}
+						ratingDeltas={postGameData}
+						gameId={game && game.id}
+						onClose={() => this.setState({ showPostGame: false })}
+					/>
+				)}
 			</div>
 		);
 	}
 }
 
-const resumeOverlayStyle = {
-	position: 'absolute',
-	top: 0,
-	left: 0,
-	right: 0,
-	bottom: 0,
-	backgroundColor: 'rgba(0,0,0,0.7)',
-	display: 'flex',
-	alignItems: 'center',
-	justifyContent: 'center',
-	zIndex: 200
-};
-
-const resumeCardStyle = {
-	backgroundColor: '#1a1a1a',
-	border: '1px solid #3d3d3d',
-	borderRadius: '8px',
-	padding: '24px 32px',
-	textAlign: 'center'
-};
-
-const resumeButtonStyle = {
-	cursor: 'pointer',
-	padding: '10px 28px',
-	borderRadius: '5px',
-	border: 'none',
-	backgroundColor: '#f97316',
-	color: '#fff',
-	fontSize: '15px',
-	fontWeight: 'bold'
-};
+const resumeOverlayStyle = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 };
+const resumeCardStyle = { backgroundColor: '#1a1a1a', border: '1px solid #3d3d3d', borderRadius: 8, padding: '24px 32px', textAlign: 'center' };
+const resumeButtonStyle = { cursor: 'pointer', padding: '10px 28px', borderRadius: 5, border: 'none', backgroundColor: '#f97316', color: '#fff', fontSize: 15, fontWeight: 'bold' };

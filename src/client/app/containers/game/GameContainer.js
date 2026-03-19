@@ -9,13 +9,16 @@ function mapStateToProps(state) {
 		renderGameBoards: !_.isEmpty(state.game.game),
 		gamePaused: !_.isEmpty(state.game.game) && state.game.game.status === 'paused',
 		gameId: state.game.game && state.game.game.id,
-		localMode: state.game.localMode
+		localMode: state.game.localMode,
+		gameTermination: state.game.gameTermination,
+		postGameData: state.game.postGameData,
+		game: state.game.game,
 	};
 }
 
 function mapDispatchToProps(dispatch) {
 	return {
-		getGameInfo: id => dispatch(getGameInfo(id))
+		getGameInfo: id => dispatch(getGameInfo(id)),
 	};
 }
 

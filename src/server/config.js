@@ -7,25 +7,20 @@ try {
 	fs.accessSync(envPath);
 	dotenv.config({ path: envPath });
 } catch (err) {
-	console.error("Couldn't load a .env file");
+	// No .env file — rely on environment variables (production)
 }
-
 
 const config = {};
 
-config.database = {
-	user: process.env.BUGHOUSE_DB_USER,
-	database: process.env.BUGHOUSE_DB_DATABASE,
-	password: process.env.BUGHOUSE_DB_PASSWORD,
-	host: process.env.BUGHOUSE_DB_HOST,
-	port: process.env.BUGHOUSE_DB_PORT
-};
+// Supabase (replaces pg-promise + custom JWT)
+config.supabaseUrl = process.env.SUPABASE_URL;
+config.supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-config.secretToken = process.env.BUGHOUSE_TOKEN_SECRET;
-config.serverPort = process.env.BUGHOUSE_SERVER_PORT;
+// Server
+config.serverPort = process.env.PORT || process.env.BUGHOUSE_SERVER_PORT || 3000;
 config.logFile = process.env.BUGHOUSE_LOG_FILE || 'log.txt';
-config.emailAddress = process.env.BUGHOUSE_EMAIL_ADDRESS;
-config.emailPassword = process.env.BUGHOUSE_EMAIL_PASSWORD;
-config.domainName = process.env.BUGHOUSE_DOMAIN_NAME;
+
+// CORS — frontend origin (Vercel URL in prod, localhost in dev)
+config.frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 module.exports = config;

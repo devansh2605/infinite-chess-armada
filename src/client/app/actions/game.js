@@ -10,88 +10,65 @@ export const RECEIVE_IS_PLAYING = 'RECEIVE_IS_PLAYING';
 export const UPDATE_DISPLAY_RESIGN_CHOICE = 'UPDATE_DISPLAY_RESIGN_CHOICE';
 export const UPDATE_DISPLAY_DRAW_CHOICE = 'UPDATE_DISPLAY_DRAW_CHOICE';
 export const UPDATE_GAME_TERMINATION = 'UPDATE_GAME_TERMINATION';
+export const UPDATE_POST_GAME_DATA = 'UPDATE_POST_GAME_DATA';
 export const RESET_GAME_STATE = 'RESET_GAME_STATE';
 export const SET_LOCAL_MODE = 'SET_LOCAL_MODE';
 
-export function updateMoves(moves) {
-	return { type: UPDATE_MOVES, moves };
-}
+export const updateMoves = moves => ({ type: UPDATE_MOVES, moves });
+export const updateClocks = clocks => ({ type: UPDATE_CLOCKS, clocks });
+export const updateReserves = (leftWhite, leftBlack, rightWhite, rightBlack) => ({ type: UPDATE_RESERVES, leftWhite, leftBlack, rightWhite, rightBlack });
+export const updatePieceToDragFromReserve = piece => ({ type: UPDATE_PIECE_TO_DRAG_FROM_RESERVE, piece });
+export const receiveGameInfo = (data, userPosition) => ({ type: RECEIVE_GAME_INFO, data, userPosition });
+export const updateDisplayResignChoice = display => ({ type: UPDATE_DISPLAY_RESIGN_CHOICE, display });
+export const updateDisplayDrawChoice = display => ({ type: UPDATE_DISPLAY_DRAW_CHOICE, display });
+export const updateGameTermination = gameTermination => ({ type: UPDATE_GAME_TERMINATION, gameTermination });
+export const updatePostGameData = postGameData => ({ type: UPDATE_POST_GAME_DATA, postGameData });
+export const receiveIsPlaying = isPlaying => ({ type: RECEIVE_IS_PLAYING, isPlaying });
+export const resetGameState = () => ({ type: RESET_GAME_STATE });
+export const setLocalMode = (playerTokens, enginePlayers) => ({ type: SET_LOCAL_MODE, playerTokens, enginePlayers });
 
-export function updateClocks(clocks) {
-	return { type: UPDATE_CLOCKS, clocks };
-}
-
-// Each reserve is an array of objects of type { color, role }
-export function updateReserves(leftWhite, leftBlack, rightWhite, rightBlack) {
-	return { type: UPDATE_RESERVES, leftWhite, leftBlack, rightWhite, rightBlack };
-}
-
-export function updatePieceToDragFromReserve(piece) {
-	return { type: UPDATE_PIECE_TO_DRAG_FROM_RESERVE, piece };
-}
-
-export function receiveGameInfo(data, userPosition) {
-	return { type: RECEIVE_GAME_INFO, data, userPosition };
-}
-
-export function updateDisplayResignChoice(display) {
-	return { type: UPDATE_DISPLAY_RESIGN_CHOICE, display };
-}
-
-export function updateDisplayDrawChoice(display) {
-	return { type: UPDATE_DISPLAY_DRAW_CHOICE, display };
-}
-
-export function updateGameTermination(gameTermination) {
-	return { type: UPDATE_GAME_TERMINATION, gameTermination };
-}
-
-export function receiveIsPlaying(isPlaying) {
-	return { type: RECEIVE_IS_PLAYING, isPlaying };
-}
-
-export function resetGameState() {
-	return { type: RESET_GAME_STATE };
-}
-
-export function setLocalMode(playerTokens, enginePlayers) {
-	return { type: SET_LOCAL_MODE, playerTokens, enginePlayers };
-}
-
-export function createLocalGame(postData) {
-	return dispatch => axios.post('/api/games/local', postData)
-		.then(response => {
-			dispatch(setLocalMode(response.data.playerTokens, response.data.enginePlayers));
-			dispatch(receiveIsPlaying(true));
-			browserHistory.push(`/game/${response.data.id}`);
-		});
+function getToken() {
+	try {
+		const appStore = require('../index').default;
+		const state = appStore.getState();
+		const user = state && state.user && state.user.currentUser;
+		return (user && user.token) || localStorage.getItem('token');
+	} catch (err) { return localStorage.getItem('token'); }
 }
 
 export function updateIsPlaying(gameID) {
 	return (dispatch, getState) => {
-		const state = getState();
-		if (state.game.localMode) {
-			dispatch(receiveIsPlaying(true));
-			return;
-		}
-		axios.put(`/api/games/userIsPlayingOrObserving/${gameID}`, { token: localStorage.getItem('token') },
-			{ validateStatus: status => (status >= 200 && status < 300) || (status === 401 || status === 403) })
-			.then(response => {
-				dispatch(receiveIsPlaying(response.data.isPlaying));
-			})
-			.catch(() => browserHistory.push('/'));
+		if (getState().game.localMode) { dispatch(receiveIsPlaying(true)); return; }
+		const token = getToken();
+		axios.put('/api/games/userIsPlayingOrObserving/' + gameID, { token },
+			{ validateStatus: s => (s >= 200 && s < 300) || s === 401 || s === 403 })
+			.then(res => dispatch(receiveIsPlaying(res.data.isPlaying)))
+			.catch(() => browserHistory.push('/local'));
 	};
 }
 
 export function getGameInfo(id) {
 	return (dispatch, getState) => {
-		const state = getState();
-		const token = state.game.localMode ? state.game.playerTokens.player1Token : localStorage.getItem('token');
-		const gameId = state.lobby.selectedGame.id || id;
-		axios.put(`/api/games/withUsers/${gameId}`, { token })
-			.then(response => {
-				const userPosition = state.game.localMode ? 1 : response.data.userPosition;
-				dispatch(receiveGameInfo(response.data, userPosition));
-			});
+		const token = getToken();
+		const lobby = getState().lobby;
+		const selectedGame = lobby && lobby.selectedGame;
+		const gameId = (selectedGame && selectedGame.id) || id;
+		axios.put('/api/games/withUsers/' + gameId, { token })
+			.then(res => dispatch(receiveGameInfo(res.data, res.data.userPosition || 1)));
+	};
+}
+
+export function fetchPostGameData(gameId) {
+	return dispatch => {
+		axios.get('/api/ratings/history?gameId=' + gameId)
+			.then(res => {
+				const deltas = {};
+				(res.data || []).forEach(row => {
+					const username = row.profile && row.profile.username;
+					deltas[row.slot] = { oldRating: row.rating_before, newRating: row.rating_after, delta: row.rating_after - row.rating_before, username };
+				});
+				dispatch(updatePostGameData(deltas));
+			})
+			.catch(() => {});
 	};
 }

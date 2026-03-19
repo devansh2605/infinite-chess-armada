@@ -1,33 +1,20 @@
 import io from 'socket.io-client';
 import { browserHistory } from 'react-router';
 import store from './index';
-import { toggleUserWaitingForGameToStart, updateDisplayedGames } from './actions/lobby';
-import { updateDisplayResignChoice, updateDisplayDrawChoice } from './actions/game';
+import { updateDisplayResignChoice, updateDisplayDrawChoice, updateGameTermination, fetchPostGameData } from './actions/game';
 import playSound from './util/sound';
 
-export const socketLobby = io('/lobby');
-export const socketLoading = io('/loading');
-export const socketGame = io('/game');
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
 
-function onSameTeam(userPosition1, userPosition2) {
-	return (
-		(userPosition1 === 1 && userPosition2 === 4)
-		|| (userPosition1 === 2 && userPosition2 === 3)
-		|| (userPosition1 === 3 && userPosition2 === 2)
-		|| (userPosition1 === 4 && userPosition2 === 1)
-		|| (userPosition1 === userPosition2)
-	);
+export const socketLobby = io(BACKEND + '/lobby', { autoConnect: false });
+export const socketGame = io(BACKEND + '/game', { autoConnect: false });
+
+// Connect game socket (connect lazily when needed)
+socketGame.connect();
+
+function onSameTeam(p1, p2) {
+	return (p1 === 1 && p2 === 4) || (p1 === 2 && p2 === 3) || (p1 === 3 && p2 === 2) || (p1 === 4 && p2 === 1) || (p1 === p2);
 }
-
-socketLobby.on('update game list', () => {
-	store.dispatch(updateDisplayedGames());
-});
-
-socketLoading.on('start game', id => {
-	store.dispatch(toggleUserWaitingForGameToStart());
-	playSound('notify');
-	browserHistory.push(`/game/${id}`);
-});
 
 socketGame.on('offer resign', resigningUserPosition => {
 	const state = store.getState().game;
@@ -45,12 +32,19 @@ socketGame.on('offer draw', () => {
 socketGame.on('decline resign', decliningUserPosition => {
 	const state = store.getState().game;
 	if (state.localMode) return;
-	if (onSameTeam(state.userPosition, decliningUserPosition)) {
-		store.dispatch(updateDisplayResignChoice(false));
-	}
+	if (onSameTeam(state.userPosition, decliningUserPosition)) store.dispatch(updateDisplayResignChoice(false));
 });
 
 socketGame.on('decline draw', () => {
 	if (store.getState().game.localMode) return;
 	store.dispatch(updateDisplayDrawChoice(false));
+});
+
+socketGame.on('game over', ({ termination, ratingDeltas }) => {
+	store.dispatch(updateGameTermination(termination));
+	// Fetch rating history from API to populate post-game modal
+	const gameState = store.getState().game;
+	const gameId = gameState && gameState.game && gameState.game.id;
+	if (gameId) store.dispatch(fetchPostGameData(gameId));
+	playSound('notify');
 });

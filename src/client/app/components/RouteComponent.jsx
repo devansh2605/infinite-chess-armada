@@ -1,8 +1,8 @@
 import React from 'react';
 import { Router, Route, browserHistory } from 'react-router';
-import axios from 'axios';
 import _ from 'lodash';
 import NotificationSystem from 'react-notification-system';
+import supabase from '../lib/supabaseClient';
 import AboutComponent from './about/AboutComponent';
 import ResetContainer from '../containers/reset/ResetContainer';
 import RegisterContainer from '../containers/register/RegisterContainer';
@@ -10,24 +10,22 @@ import LeaderboardContainer from '../containers/leaderboard/LeaderboardContainer
 import LoadingContainer from '../containers/game/LoadingContainer';
 import GameContainer from '../containers/game/GameContainer';
 import ProfileContainer from '../containers/profile/ProfileContainer';
-import LocalGameSetupContainer from '../containers/home/LocalGameSetupContainer';
 import GameHistoryComponent from './home/GameHistoryComponent';
+import AuthContainer from '../containers/auth/AuthContainer';
+import LobbyContainerPage from '../containers/auth/LobbyContainer';
+import LobbyWaitingRoomContainer from '../containers/auth/LobbyWaitingRoomContainer';
 
 export default class RouteComponent extends React.Component {
 	constructor(props) {
 		super(props);
-		this.requireAboutToPlay = this.requireAboutToPlay.bind(this);
 		this.requireProfileUser = this.requireProfileUser.bind(this);
 		this.requireResetToken = this.requireResetToken.bind(this);
 		this.requireGame = this.requireGame.bind(this);
-		this.requireAuth = this.requireAuth.bind(this);
 		this.enterHomeComponent = this.enterHomeComponent.bind(this);
+		this.requireAboutToPlay = this.requireAboutToPlay.bind(this);
 	}
 
-	shouldComponentUpdate() {
-		// To ignore warning: [react-router] You cannot change 'Router routes'; it will be ignored
-		return false;
-	}
+	shouldComponentUpdate() { return false; }
 
 	componentWillReceiveProps(nextProps) {
 		if (!_.isEmpty(nextProps.notification)) {
@@ -37,55 +35,24 @@ export default class RouteComponent extends React.Component {
 	}
 
 	requireAboutToPlay() {
-		if (!localStorage.getItem('token') || !this.props.selectedGame.id) {
-			browserHistory.push('/');
-		}
+		if (!localStorage.getItem('token') || !this.props.selectedGame.id) browserHistory.push('/local');
 	}
 
 	requireProfileUser(nextState) {
-		const username = nextState.params.splat;
-		this.props.updateSelectedProfile(username);
+		this.props.updateSelectedProfile(nextState.params.splat);
 	}
 
 	requireResetToken(nextState) {
 		const resetToken = nextState.params.splat;
-		if (resetToken) {
-			this.props.updateResetToken(resetToken);
-			browserHistory.push('/reset/');
-		}
+		if (resetToken) { this.props.updateResetToken(resetToken); browserHistory.push('/reset/'); }
 	}
 
 	requireGame(nextState) {
 		const gameID = nextState.params.splat;
-		if (localStorage.getItem('token')) {
-			this.props.updateIsPlaying(gameID);
-		}
-	}
-
-	requireAuth(nextState, replace) {
-		function redirectRoute() {
-			replace({
-				pathname: '/login',
-				state: { nextPathname: nextState.location.pathname }
-			});
-		}
-		const token = localStorage.getItem('token');
-		// Redirect route to login page if the auth token does not exist
-		if (!token) {
-			redirectRoute();
-			return;
-		}
-		// Verify that the auth token is valid
-		axios.post('/api/verification/', { token }, { validateStatus: status => (status >= 200 && status < 300) || (status === 401 || status === 403) })
-			.then(res => {
-				// Route to login page if the auth token is not valid
-				if (!res.data.success) browserHistory.push('/login');
-			})
-			.catch(console.error);
+		if (localStorage.getItem('token')) this.props.updateIsPlaying(gameID);
 	}
 
 	enterHomeComponent() {
-		// Clear game information
 		this.props.resetGameState();
 		this.props.clearSelectedGame();
 		return true;
@@ -96,6 +63,9 @@ export default class RouteComponent extends React.Component {
 			<div>
 				<NotificationSystem ref={c => { this.notificationSystem = c; }} />
 				<Router history={browserHistory}>
+					<Route path="/auth" component={AuthContainer} />
+					<Route path="/local" component={LobbyContainerPage} onEnter={this.enterHomeComponent} />
+					<Route path="/lobby/*" component={LobbyWaitingRoomContainer} />
 					<Route path="/about" component={AboutComponent} />
 					<Route path="/user/*" component={ProfileContainer} onEnter={this.requireProfileUser} />
 					<Route path="/register" component={RegisterContainer} />
@@ -103,9 +73,8 @@ export default class RouteComponent extends React.Component {
 					<Route path="/leaderboard" component={LeaderboardContainer} />
 					<Route path="/loading" component={LoadingContainer} onEnter={this.requireAboutToPlay} />
 					<Route path="/game/*" component={GameContainer} onEnter={this.requireGame} />
-					<Route path="/local" component={LocalGameSetupContainer} onEnter={this.enterHomeComponent} />
 					<Route path="/history" component={GameHistoryComponent} />
-					<Route path="*" onEnter={() => browserHistory.push("/local")} />
+					<Route path="*" onEnter={() => browserHistory.push('/local')} />
 				</Router>
 			</div>
 		);

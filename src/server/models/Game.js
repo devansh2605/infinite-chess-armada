@@ -1,349 +1,336 @@
-const _ = require('lodash');
-const database = require('./database');
-const User = require('./User');
-const Rating = require('./Rating');
-
-const db = database.db;
-const sqlFile = database.sqlFile;
+const supabase = require('../lib/supabaseAdmin');
+const ProfileModel = require('./ProfileModel');
+const { computeEloUpdates } = require('../lib/elo');
+const logger = require('../logger');
 
 class Game {
-	constructor(id, player1, player2, player3, player4, minutes, increment, ratingRange,
-				mode, status, termination, joinRandom, timestamp, clocks, moves, leftLastTime, rightLastTime,
-				leftFens, rightFens, leftReserveWhite, leftReserveBlack, rightReserveWhite, rightReserveBlack,
-				leftPromotedPieces, rightPromotedPieces, leftLastMove, rightLastMove, leftColorToPlay,
-				rightColorToPlay, resignState, drawState) {
-		this.id = id;
-		this.player1 = player1;
-		this.player2 = player2;
-		this.player3 = player3;
-		this.player4 = player4;
-		this.minutes = minutes;
-		this.increment = increment;
-		this.ratingRange = ratingRange;
-		this.mode = mode;
-		this.status = status;
-		this.termination = termination;
-		this.joinRandom = joinRandom;
-		this.timestamp = timestamp;
-		this.clocks = clocks;
-		this.moves = moves;
-		this.left_last_time = leftLastTime;
-		this.right_last_time = rightLastTime;
-		this.left_fens = leftFens;
-		this.right_fens = rightFens;
-		this.left_reserve_white = leftReserveWhite;
-		this.left_reserve_black = leftReserveBlack;
-		this.right_reserve_white = rightReserveWhite;
-		this.right_reserve_black = rightReserveBlack;
-		this.left_promoted_pieces = leftPromotedPieces;
-		this.right_promoted_pieces = rightPromotedPieces;
-		this.left_last_move = leftLastMove;
-		this.right_last_move = rightLastMove;
-		this.left_color_to_play = leftColorToPlay;
-		this.right_color_to_play = rightColorToPlay;
-		this.resign_state = resignState;
-		this.draw_state = drawState;
-	}
-
-	static createTable() {
-		return db.none(sqlFile('game/create_games_table.sql'));
+	constructor(row) {
+		Object.assign(this, row);
 	}
 
 	static mapRow(row) {
-		return new Game(
-			row.id, row.player1, row.player2, row.player3, row.player4,
-			row.minutes, row.increment, row.rating_range, row.mode, row.status, row.termination, row.join_random,
-			row.timestamp, row.clocks, row.moves, row.left_last_time, row.right_last_time, row.left_fens, row.right_fens,
-			row.left_reserve_white, row.left_reserve_black,	row.right_reserve_white, row.right_reserve_black,
-			row.left_promoted_pieces, row.right_promoted_pieces, row.left_last_move, row.right_last_move,
-			row.left_color_to_play, row.right_color_to_play, row.resign_state, row.draw_state
-		);
+		return new Game(row);
 	}
 
 	static mapRowGameWithUsers(row) {
-		const mappedObj = {
-			player1: {},
-			player2: {},
-			player3: {},
-			player4: {},
+		// row has player1, player2, player3, player4 as UUIDs
+		// and player1_profile, etc. as joined objects from profiles
+		return {
+			id: row.id,
+			status: row.status,
+			mode: row.mode,
+			minutes: row.minutes,
+			increment: row.increment,
+			clocks: row.clocks,
+			moves: row.moves,
+			left_fens: row.left_fens,
+			right_fens: row.right_fens,
+			left_reserve_white: row.left_reserve_white,
+			left_reserve_black: row.left_reserve_black,
+			right_reserve_white: row.right_reserve_white,
+			right_reserve_black: row.right_reserve_black,
+			left_promoted_pieces: row.left_promoted_pieces,
+			right_promoted_pieces: row.right_promoted_pieces,
+			left_last_move: row.left_last_move,
+			right_last_move: row.right_last_move,
+			left_color_to_play: row.left_color_to_play,
+			right_color_to_play: row.right_color_to_play,
+			left_last_time: row.left_last_time,
+			right_last_time: row.right_last_time,
+			resign_state: row.resign_state,
+			draw_state: row.draw_state,
+			termination: row.termination,
+			engine_slots: row.engine_slots || {},
+			engine_levels: row.engine_levels || {},
+			player1: row.player1_profile || { id: row.player1, username: 'Engine', rating: 0 },
+			player2: row.player2_profile || { id: row.player2, username: 'Engine', rating: 0 },
+			player3: row.player3_profile || { id: row.player3, username: 'Engine', rating: 0 },
+			player4: row.player4_profile || { id: row.player4, username: 'Engine', rating: 0 },
+			player1_rating_start: row.player1_rating_start,
+			player2_rating_start: row.player2_rating_start,
+			player3_rating_start: row.player3_rating_start,
+			player4_rating_start: row.player4_rating_start,
 		};
-		_.forOwn(row, (value, key) => {
-			if (key.substring(0, 6) === 'player') {
-				if (key[6] === '1') {
-					mappedObj.player1[key.substring(7)] = value;
-				} else if (key[6] === '2') {
-					mappedObj.player2[key.substring(7)] = value;
-				} else if (key[6] === '3') {
-					mappedObj.player3[key.substring(7)] = value;
-				} else {
-					mappedObj.player4[key.substring(7)] = value;
-				}
-			} else {
-				mappedObj[key] = value;
-			}
-		});
-		return mappedObj;
-	}
-
-	static async getAll() {
-		const rows = await db.any(sqlFile('game/get_all_games.sql'));
-		return rows.map(Game.mapRow);
-	}
-
-	static async getAllOpen() {
-		const rows = await db.any(sqlFile('game/get_all_open_games.sql'));
-		return rows.map(Game.mapRowGameWithUsers);
 	}
 
 	static async getByID(id) {
-		try {
-			const row = await db.oneOrNone(sqlFile('game/get_game_by_id.sql'), { id: id });
-			if (row) {
-				return Game.mapRow(row);
-			}
-			const err = new Error();
+		const { data, error } = await supabase
+			.from('games')
+			.select('*')
+			.eq('id', id)
+			.single();
+		if (error || !data) {
+			const err = new Error('Game not found');
 			err.status = 401;
 			throw err;
-		} catch (err) {
-			if (!err.status) {
-				err.status = 500;
-			}
-			throw err;
 		}
+		return Game.mapRow(data);
+	}
+
+	static async getByRoomCode(roomCode) {
+		const { data, error } = await supabase
+			.from('games')
+			.select('*')
+			.eq('room_code', roomCode)
+			.eq('status', 'lobby')
+			.single();
+		if (error || !data) return null;
+		return Game.mapRow(data);
 	}
 
 	static async getGameWithUsersByID(id) {
-		try {
-			const row = await db.oneOrNone(sqlFile('game/get_game_with_users_by_id.sql'), { id: id });
-			if (row) {
-				return Game.mapRowGameWithUsers(row);
-			}
-			const err = new Error();
+		const { data, error } = await supabase
+			.from('games')
+			.select(`
+				*,
+				player1_profile:profiles!games_player1_fkey(id, username, rating),
+				player2_profile:profiles!games_player2_fkey(id, username, rating),
+				player3_profile:profiles!games_player3_fkey(id, username, rating),
+				player4_profile:profiles!games_player4_fkey(id, username, rating)
+			`)
+			.eq('id', id)
+			.single();
+		if (error || !data) {
+			const err = new Error('Game not found');
 			err.status = 401;
 			throw err;
-		} catch (err) {
-			if (!err.status) {
-				err.status = 500;
-			}
-			throw err;
 		}
+		return Game.mapRowGameWithUsers(data);
 	}
 
-	static async updatePlayer(id, playerPosition, player) {
-		try {
-			const user = await User.getByID(player);
-			const game = await Game.getByID(id);
-			let userRating;
-			const gameRatingRange = game.ratingRange.split(' - ');
-			if (game.minutes < 3) {
-				userRating = user.ratingBullet;
-			} else if (game.minutes >= 3 && game.minutes <= 8) {
-				userRating = user.ratingBlitz;
-			} else {
-				userRating = user.ratingClassical;
-			}
-			const playerNum = parseInt(player);
-			// Check if player is not already in the game
-			if (playerNum !== game.player1 && playerNum !== game.player2 && playerNum !== game.player3 && playerNum !== game.player4) {
-				// Check if player's rating is within game rating range and not overriding other player
-				if (userRating >= gameRatingRange[0] && userRating <= gameRatingRange[1] && game[playerPosition] === null) {
-					const playerRatingColumn = `${playerPosition}_rating`;
-					await db.none(sqlFile('game/update_player_open_game.sql'), { id, playerPosition, player, playerRatingColumn, userRating });
-					return true;
-				}
-			}
-		} catch (err) {
-			return false;
-		}
-		return false;
-	}
-
-	static async removePlayerFromGame(userID, gameID) {
-		try {
-			const game = await Game.getByID(gameID);
-			let userPosition = null;
-			let activePlayers = 0;
-			if (game.player1 === userID) userPosition = 1;
-			else if (game.player2 === userID) userPosition = 2;
-			else if (game.player3 === userID) userPosition = 3;
-			else if (game.player4 === userID) userPosition = 4;
-			if (userPosition === null || game.status !== 'open') {
-				const err = new Error();
-				err.status = 400;
-				throw err;
-			}
-			if (game.player1 !== null) activePlayers += 1;
-			if (game.player2 !== null) activePlayers += 1;
-			if (game.player3 !== null) activePlayers += 1;
-			if (game.player4 !== null) activePlayers += 1;
-			if (activePlayers > 1) {
-				await db.none(sqlFile('game/update_player_open_game.sql'), {
-					playerPosition: `player${userPosition}`,
-					player: null,
-					playerRatingColumn: `player${userPosition}_rating`,
-					userRating: null,
-					id: gameID
-				});
-			} else {
-				await db.none(sqlFile('game/remove_game.sql'), { id: gameID });
-			}
-		} catch (err) {
-			if (!err.status) {
-				err.status = 500;
-			}
-			throw err;
-		}
-	}
-
-	static async tryToStartGame(id) {
-		const game = await Game.getByID(id);
-		if (game.player1 !== null && game.player2 !== null && game.player3 !== null && game.player4 !== null) {
-			await db.none(sqlFile('game/start_game.sql'), { id });
-			return true;
-		}
-		return false;
-	}
-
-	static async createGame(player1, player2, player3, player4, minutes, increment, ratingRange, mode, joinRandom) {
-		// Only player1 or player2 will be defined, add initial rating of player who created game to game row, others updated later
-		const status = 'open';
-		let ratingColumnOfFirstPlayer = 'player1_rating';
-		let user;
-		let rating;
-		if (player2 === null) {
-			user = await User.getByID(player1);
-		} else {
-			ratingColumnOfFirstPlayer = 'player2_rating';
-			user = await User.getByID(player2);
-		}
-		if (minutes < 3) {
-			rating = user.ratingBullet;
-		} else if (minutes >= 3 && minutes <= 8) {
-			rating = user.ratingBlitz;
-		} else {
-			rating = user.ratingClassical;
-		}
-
-		// Calculate random unique game id
-		const rowNumStart = await db.one(sqlFile('game/get_number_games.sql'));
-		const numGamesStart = rowNumStart.count;
-		let numGamesEnd = numGamesStart;
+	static async createLobbyGame(creatorId, minutes, increment) {
+		// Generate unique room code
+		const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+		let roomCode, inserted = false;
 		let id;
-		while (numGamesStart === numGamesEnd) {
-			id = (Math.random() + 1).toString(36).substr(2, 12);
-			await db.none(sqlFile('game/create_game.sql'),
-				{ id, player1, player2, player3, player4, minutes, increment, ratingRange, mode, status, joinRandom, ratingColumnOfFirstPlayer, rating });
-			const rowNumEnd = await db.one(sqlFile('game/get_number_games.sql'));
-			numGamesEnd = rowNumEnd.count;
-		}
-		return id;
-	}
 
-	static async createLocalGame(player1, player2, player3, player4, minutes, increment) {
-		const ratingRange = '0 - 3000';
-		const mode = 'Casual';
-		const joinRandom = false;
-		const status = 'open';
+		while (!inserted) {
+			roomCode = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+			id = Math.random().toString(36).substr(2, 12);
 
-		const users = await Promise.all([
-			User.getByID(player1), User.getByID(player2),
-			User.getByID(player3), User.getByID(player4)
-		]);
-
-		function getRating(user) {
-			if (minutes < 3) return user.ratingBullet;
-			if (minutes >= 3 && minutes <= 8) return user.ratingBlitz;
-			return user.ratingClassical;
-		}
-
-		const rowNumStart = await db.one(sqlFile('game/get_number_games.sql'));
-		const numGamesStart = rowNumStart.count;
-		let numGamesEnd = numGamesStart;
-		let id;
-		while (numGamesStart === numGamesEnd) {
-			id = (Math.random() + 1).toString(36).substr(2, 12);
-			await db.none(sqlFile('game/create_game.sql'), {
-				id, player1, player2, player3, player4,
-				minutes, increment, ratingRange, mode, status, joinRandom,
-				ratingColumnOfFirstPlayer: 'player1_rating',
-				rating: getRating(users[0])
+			const { error } = await supabase.from('games').insert({
+				id,
+				room_code: roomCode,
+				status: 'lobby',
+				mode: 'Rated',
+				creator_id: creatorId,
+				minutes,
+				increment,
+				clocks: '0,0,0,0',
+				left_fens: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+				right_fens: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+				left_last_move: '[]',
+				right_last_move: '[]',
+				left_color_to_play: 'white',
+				right_color_to_play: 'white',
+				resign_state: '0,0,0,0',
+				draw_state: '0,0,0,0',
+				engine_slots: {},
+				engine_levels: {},
 			});
-			const rowNumEnd = await db.one(sqlFile('game/get_number_games.sql'));
-			numGamesEnd = rowNumEnd.count;
+
+			if (!error) inserted = true;
 		}
 
-		await db.none('UPDATE games SET player2_rating = $1, player3_rating = $2, player4_rating = $3 WHERE id = $4',
-			[getRating(users[1]), getRating(users[2]), getRating(users[3]), id]);
-
-		await db.none(sqlFile('game/start_game.sql'), { id });
-
-		return id;
+		return { id, roomCode };
 	}
 
-	/**
-	 * End a game
-	 * @param {Object} game
-	 * @param {String} termination
-	 * @param {Object} socket
-	 * @param {Object} gameSocket
-	 * @param {Function} clearRoom
-	 * @returns {Promise.<void>}
-	 */
+	static async assignSlot(gameId, slot, userId) {
+		const col = `player${slot}`;
+		const { error } = await supabase
+			.from('games')
+			.update({ [col]: userId })
+			.eq('id', gameId);
+		if (error) throw new Error(error.message);
+	}
+
+	static async releaseSlot(gameId, slot) {
+		const col = `player${slot}`;
+		const { error } = await supabase
+			.from('games')
+			.update({ [col]: null })
+			.eq('id', gameId);
+		if (error) throw new Error(error.message);
+	}
+
+	static async setEngineSlot(gameId, slot, level, game) {
+		const engineSlots = { ...(game.engine_slots || {}) };
+		const engineLevels = { ...(game.engine_levels || {}) };
+		engineSlots[slot] = true;
+		engineLevels[slot] = level;
+
+		// Clear human assignment for this slot
+		const { error } = await supabase
+			.from('games')
+			.update({ [`player${slot}`]: null, engine_slots: engineSlots, engine_levels: engineLevels })
+			.eq('id', gameId);
+		if (error) throw new Error(error.message);
+	}
+
+	static async clearEngineSlot(gameId, slot, game) {
+		const engineSlots = { ...(game.engine_slots || {}) };
+		const engineLevels = { ...(game.engine_levels || {}) };
+		delete engineSlots[slot];
+		delete engineLevels[slot];
+		const { error } = await supabase
+			.from('games')
+			.update({ engine_slots: engineSlots, engine_levels: engineLevels })
+			.eq('id', gameId);
+		if (error) throw new Error(error.message);
+	}
+
+	static async updateTimeControl(gameId, minutes, increment) {
+		const { error } = await supabase
+			.from('games')
+			.update({ minutes, increment })
+			.eq('id', gameId);
+		if (error) throw new Error(error.message);
+	}
+
+	static async snapshotStartRatings(game) {
+		const updates = {};
+		for (const slot of [1, 2, 3, 4]) {
+			const playerId = game[`player${slot}`];
+			if (playerId && !game.engine_slots?.[slot]) {
+				const profile = await ProfileModel.getByID(playerId);
+				updates[`player${slot}_rating_start`] = profile.rating;
+			}
+		}
+		const { error } = await supabase.from('games').update(updates).eq('id', game.id);
+		if (error) throw new Error(error.message);
+	}
+
+	static async startGame(gameId) {
+		const now = Date.now();
+		const { error } = await supabase
+			.from('games')
+			.update({
+				status: 'playing',
+				room_code: null,
+				left_last_time: now,
+				right_last_time: now,
+			})
+			.eq('id', gameId);
+		if (error) throw new Error(error.message);
+	}
+
 	static async pauseGame(id, clocksArr) {
-		await db.none(
-			`UPDATE Games SET status='paused', clocks=$1, left_last_time=NULL, right_last_time=NULL WHERE id=$2`,
-			[clocksArr.join(','), id]
-		);
+		const { error } = await supabase
+			.from('games')
+			.update({ status: 'paused', clocks: clocksArr.join(','), left_last_time: null, right_last_time: null })
+			.eq('id', id);
+		if (error) throw new Error(error.message);
 	}
 
 	static async resumeGame(id) {
 		const now = Date.now();
-		await db.none(
-			`UPDATE Games SET status='playing', left_last_time=$1, right_last_time=$2 WHERE id=$3`,
-			[now, now, id]
-		);
+		const { error } = await supabase
+			.from('games')
+			.update({ status: 'playing', left_last_time: now, right_last_time: now })
+			.eq('id', id);
+		if (error) throw new Error(error.message);
 	}
 
 	static async getPausedGames() {
-		return db.any(`
-			SELECT g.id, g.minutes, g.increment, g.mode, g.clocks,
-			       u1.username p1, u2.username p2, u3.username p3, u4.username p4
-			FROM Games g
-			JOIN Users u1 ON g.player1=u1.id
-			JOIN Users u2 ON g.player2=u2.id
-			JOIN Users u3 ON g.player3=u3.id
-			JOIN Users u4 ON g.player4=u4.id
-			WHERE g.status='paused'
-			ORDER BY g.timestamp DESC
-		`);
+		const { data, error } = await supabase
+			.from('games')
+			.select(`
+				id, minutes, increment, mode, clocks,
+				p1:profiles!games_player1_fkey(username),
+				p2:profiles!games_player2_fkey(username),
+				p3:profiles!games_player3_fkey(username),
+				p4:profiles!games_player4_fkey(username)
+			`)
+			.eq('status', 'paused')
+			.order('created_at', { ascending: false });
+		if (error) return [];
+		return (data || []).map(r => ({
+			...r, p1: r.p1?.username, p2: r.p2?.username, p3: r.p3?.username, p4: r.p4?.username
+		}));
 	}
 
 	static async getRecentCompleted(limit = 30) {
-		return db.any(`
-			SELECT g.id, g.minutes, g.increment, g.mode, g.termination, g.timestamp,
-			       u1.username p1, u2.username p2, u3.username p3, u4.username p4
-			FROM Games g
-			JOIN Users u1 ON g.player1=u1.id
-			JOIN Users u2 ON g.player2=u2.id
-			JOIN Users u3 ON g.player3=u3.id
-			JOIN Users u4 ON g.player4=u4.id
-			WHERE g.status='terminated'
-			ORDER BY g.timestamp DESC LIMIT $1`, [limit]);
+		const { data, error } = await supabase
+			.from('games')
+			.select(`
+				id, minutes, increment, mode, termination, created_at,
+				p1:profiles!games_player1_fkey(username),
+				p2:profiles!games_player2_fkey(username),
+				p3:profiles!games_player3_fkey(username),
+				p4:profiles!games_player4_fkey(username)
+			`)
+			.eq('status', 'terminated')
+			.order('created_at', { ascending: false })
+			.limit(limit);
+		if (error) return [];
+		return (data || []).map(r => ({
+			...r, p1: r.p1?.username, p2: r.p2?.username, p3: r.p3?.username, p4: r.p4?.username
+		}));
 	}
 
 	static async endGame(game, termination, socket, gameSocket, clearRoom) {
-		const terminationQueryString = 'UPDATE Games SET termination = $1, status = $2 WHERE id = $3';
-		await db.none(terminationQueryString, [termination, 'terminated', game.id]);
-		gameSocket.in(socket.room).emit('game over', { termination });
+		const { error } = await supabase
+			.from('games')
+			.update({ termination, status: 'terminated' })
+			.eq('id', game.id);
+		if (error) logger.error(`endGame update error: ${error.message}`);
 
 		let winner = 'draw';
 		if (termination.includes('Team 1 is victorious')) winner = 'team1';
 		if (termination.includes('Team 2 is victorious')) winner = 'team2';
 
+		// Compute and apply Elo ratings
+		let ratingDeltas = null;
 		if (game.mode === 'Rated') {
-			await Rating.updateRatings(game, winner);
+			try {
+				ratingDeltas = await Game._applyEloUpdates(game, winner);
+			} catch (eloErr) {
+				logger.error(`Elo update error: ${eloErr.message}`);
+			}
 		}
+
+		gameSocket.in(socket.room).emit('game over', { termination, ratingDeltas });
 		clearRoom(socket.room, '/game');
+	}
+
+	static async _applyEloUpdates(game, winner) {
+		// Fetch human player profiles
+		const profiles = {};
+		for (const slot of [1, 2, 3, 4]) {
+			const playerId = game[`player${slot}`];
+			const isEngine = game.engine_slots && game.engine_slots[slot];
+			if (playerId && !isEngine) {
+				profiles[`p${slot}`] = await ProfileModel.getByID(playerId);
+			} else {
+				profiles[`p${slot}`] = null;
+			}
+		}
+
+		const updates = computeEloUpdates(profiles, winner);
+		const ratingDeltas = {};
+
+		// Persist updates
+		for (const [slot, upd] of Object.entries(updates)) {
+			await ProfileModel.updateRating(upd.id, upd.newRating);
+			await ProfileModel.incrementGamesPlayed(upd.id);
+			ratingDeltas[slot] = upd;
+
+			// Insert rating_history row
+			const result = winner === 'draw' ? 'draw'
+				: ([1, 4].includes(Number(slot)) && winner === 'team1') || ([2, 3].includes(Number(slot)) && winner === 'team2')
+					? 'win' : 'loss';
+
+			await supabase.from('rating_history').insert({
+				game_id: game.id,
+				player_id: upd.id,
+				slot: Number(slot),
+				rating_before: upd.oldRating,
+				rating_after: upd.newRating,
+				result,
+			});
+		}
+
+		return ratingDeltas;
 	}
 }
 

@@ -4,25 +4,27 @@ const app = require('./app');
 const logger = require('./logger');
 const http = require('http');
 
-const serverPort = require('./config').serverPort;
+const config = require('./config');
 
 function normalizePort(val) {
 	const portParsed = parseInt(val);
-	if (isNaN(portParsed)) {
-		return val;
-	}
-	if (portParsed >= 0) {
-		return portParsed;
-	}
+	if (isNaN(portParsed)) return val;
+	if (portParsed >= 0) return portParsed;
 	return false;
 }
 
-const port = normalizePort(serverPort || '3000');
+const port = normalizePort(config.serverPort);
 app.set('port', port);
 
 const server = http.createServer(app);
 
-const io = require('socket.io')(server);
+const io = require('socket.io')(server, {
+	cors: {
+		origin: config.frontendUrl,
+		methods: ['GET', 'POST'],
+		credentials: true,
+	},
+});
 require('./services/socket')(io);
 
 function onError(error) {

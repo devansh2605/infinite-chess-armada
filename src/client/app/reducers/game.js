@@ -8,87 +8,30 @@ const defaultState = {
 	userPosition: null,
 	moves: [],
 	clocks: [],
-	reserves: {
-		leftWhite: [],
-		leftBlack: [],
-		rightWhite: [],
-		rightBlack: []
-	},
+	reserves: { leftWhite: [], leftBlack: [], rightWhite: [], rightBlack: [] },
 	pieceToDragFromReserve: {},
 	displayResignChoice: false,
 	displayDrawChoice: false,
 	localMode: false,
 	playerTokens: null,
-	enginePlayers: null
+	enginePlayers: null,
+	postGameData: null,
 };
 
-export default function user(state = defaultState, action) {
+export default function gameReducer(state = defaultState, action) {
 	switch (action.type) {
-		case gameActions.RECEIVE_IS_PLAYING:
-			return {
-				...state,
-				isPlaying: action.isPlaying
-			};
-		case gameActions.UPDATE_MOVES:
-			return { ...state, moves: action.moves };
-		case gameActions.UPDATE_CLOCKS:
-			return {
-				...state,
-				clocks: action.clocks
-			};
-		case gameActions.UPDATE_RESERVES:
-			return {
-				...state,
-				reserves: {
-					leftWhite: action.leftWhite,
-					leftBlack: action.leftBlack,
-					rightWhite: action.rightWhite,
-					rightBlack: action.rightBlack
-				}
-			};
-		case gameActions.UPDATE_PIECE_TO_DRAG_FROM_RESERVE: {
-			return {
-				...state,
-				pieceToDragFromReserve: action.piece
-			};
-		}
-		case gameActions.UPDATE_DISPLAY_RESIGN_CHOICE: {
-			return {
-				...state,
-				displayResignChoice: action.display
-			};
-		}
-		case gameActions.UPDATE_DISPLAY_DRAW_CHOICE: {
-			return {
-				...state,
-				displayDrawChoice: action.display
-			};
-		}
-		case gameActions.UPDATE_GAME_TERMINATION: {
-			return {
-				...state,
-				gameTermination: action.gameTermination
-			};
-		}
-		case gameActions.SET_LOCAL_MODE: {
-			return {
-				...state,
-				localMode: true,
-				playerTokens: action.playerTokens,
-				enginePlayers: action.enginePlayers || null
-			};
-		}
-		case gameActions.RECEIVE_GAME_INFO: {
-			return {
-				...state,
-				game: action.data,
-				userPosition: action.userPosition
-			};
-		}
-		case gameActions.RESET_GAME_STATE: {
-			return _.cloneDeep(defaultState);
-		}
-		default:
-			return state;
+		case gameActions.RECEIVE_IS_PLAYING: return { ...state, isPlaying: action.isPlaying };
+		case gameActions.UPDATE_MOVES: return { ...state, moves: action.moves };
+		case gameActions.UPDATE_CLOCKS: return { ...state, clocks: action.clocks };
+		case gameActions.UPDATE_RESERVES: return { ...state, reserves: { leftWhite: action.leftWhite, leftBlack: action.leftBlack, rightWhite: action.rightWhite, rightBlack: action.rightBlack } };
+		case gameActions.UPDATE_PIECE_TO_DRAG_FROM_RESERVE: return { ...state, pieceToDragFromReserve: action.piece };
+		case gameActions.UPDATE_DISPLAY_RESIGN_CHOICE: return { ...state, displayResignChoice: action.display };
+		case gameActions.UPDATE_DISPLAY_DRAW_CHOICE: return { ...state, displayDrawChoice: action.display };
+		case gameActions.UPDATE_GAME_TERMINATION: return { ...state, gameTermination: action.gameTermination };
+		case gameActions.UPDATE_POST_GAME_DATA: return { ...state, postGameData: action.postGameData };
+		case gameActions.SET_LOCAL_MODE: return { ...state, localMode: true, playerTokens: action.playerTokens, enginePlayers: action.enginePlayers || null };
+		case gameActions.RECEIVE_GAME_INFO: return { ...state, game: action.data, userPosition: action.userPosition };
+		case gameActions.RESET_GAME_STATE: return _.cloneDeep(defaultState);
+		default: return state;
 	}
 }
