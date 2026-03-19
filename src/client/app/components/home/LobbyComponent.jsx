@@ -19,17 +19,10 @@ export default class LobbyComponent extends React.Component {
 			if (game.player3.id === null) openSlots.push(3);
 			if (game.player4.id === null) openSlots.push(4);
 			const slot = openSlots[Math.floor(Math.random() * openSlots.length)];
-			const putData = {
-				player: this.props.currentUser.id,
-				playerPosition: `player${slot}`
-			};
+			const putData = { player: this.props.currentUser.id, playerPosition: `player${slot}` };
 			axios.put(`/api/games/open/${game.id}`, putData)
-				.then(() => {
-					this.props.updateSelectedGame(game);
-				})
-				.catch(() => {
-					showErrorNotification('You cannot join this game');
-				});
+				.then(() => { this.props.updateSelectedGame(game); })
+				.catch(() => { showErrorNotification('You cannot join this game'); });
 		} else {
 			this.props.updateModalDisplayedGame(game);
 			this.props.toggleModalDisplay();
@@ -37,13 +30,6 @@ export default class LobbyComponent extends React.Component {
 	}
 
 	render() {
-		const underlineStyle = {
-			textDecoration: 'underline'
-		};
-		const cursorStyle = {
-			cursor: 'pointer'
-		};
-
 		function getSlots(game) {
 			let count = 0;
 			if (game.player1.id !== null) count++;
@@ -53,83 +39,75 @@ export default class LobbyComponent extends React.Component {
 			return `${count}/4`;
 		}
 
-		function formatColor(player) {
-			if (player.id === null) {
-				return 'text-success';
-			}
-			return '';
-		}
 		function formatPlayer(player, game) {
 			if (player.id !== null) {
-				let returnString = '';
-				if (player.title !== null) {
-					returnString += `${player.title} `;
-				}
-				returnString += player.username;
-				if (game.minutes < 3) {
-					returnString += ` (${Math.round(player.ratingBullet)})`;
-				} else if (game.minutes >= 3 && game.minutes <= 8) {
-					returnString += ` (${Math.round(player.ratingBlitz)})`;
-				} else {
-					returnString += ` (${Math.round(player.ratingClassical)})`;
-				}
-				return returnString;
+				let s = player.title ? `${player.title} ` : '';
+				s += player.username;
+				if (game.minutes < 3) s += ` (${Math.round(player.ratingBullet)})`;
+				else if (game.minutes <= 8) s += ` (${Math.round(player.ratingBlitz)})`;
+				else s += ` (${Math.round(player.ratingClassical)})`;
+				return s;
 			}
-			return 'empty';
+			return <span className="text-green-500">open</span>;
 		}
 
 		function formatRange(game) {
-			return `${parseInt(game.ratingRange.substring(0, game.ratingRange.indexOf('-')))} to ${parseInt(game.ratingRange.substring(game.ratingRange.indexOf('-') + 1))}`;
+			const idx = game.ratingRange.indexOf('-');
+			return `${parseInt(game.ratingRange.substring(0, idx))}–${parseInt(game.ratingRange.substring(idx + 1))}`;
 		}
 
-		function formatRandom(game) {
-			return game.joinRandom ? 'Yes' : 'No';
-		}
 		/* eslint-disable jsx-a11y/no-static-element-interactions */
 		return (
-			<div className="col-md-9">
-				<h3 style={underlineStyle}>Lobby:</h3>
-				<div id="lobbyTable">
-					<table className="table table-hover table-condensed table-fixedheader">
-						<thead>
-							<tr>
-								<th width="10%">Slots</th>
-								<th width="15%">Mode</th>
-								<th width="35%">Players</th>
-								<th width="15%">Time Control</th>
-								<th width="15%">Rating Range</th>
-								<th width="10%">Join Random</th>
-							</tr>
-						</thead>
-						<tbody>
-							{this.props.displayedGames.map((game, index) =>
-								<tr onClick={() => this.addPlayer(game)} key={index} style={cursorStyle}>
-									<td width="10%">{getSlots(game)}</td>
-									<td width="15%">{game.mode}</td>
-									<td width="35%">
-										<div className="row">
-											<div className={`col-xs-6 ${formatColor(game.player2)}`}>
-												{ game.player2.title && <div className="title-color title">{game.player2.title}</div> }
-												{formatPlayer(game.player2, game)}
-											</div>
-											<div className={`col-xs-6 ${formatColor(game.player3)}`}>{formatPlayer(game.player3, game)}
-											</div>
-										</div>
-										<div className="row">
-											<div className={`col-xs-6 ${formatColor(game.player1)}`}>{formatPlayer(game.player1, game)}
-											</div>
-											<div className={`col-xs-6 ${formatColor(game.player4)}`}>{formatPlayer(game.player4, game)}
-											</div>
-										</div>
-									</td>
-									<td width="15%">{`${game.minutes}+${game.increment}`}</td>
-									<td width="15%">{formatRange(game)}</td>
-									<td width="10%">{formatRandom(game)}</td>
+			<div className="flex-1 min-w-0">
+				<h2 className="text-text-main text-lg font-semibold mb-3">Open Games</h2>
+				{this.props.displayedGames.length === 0 ? (
+					<p className="text-text-dim text-sm">No open games. Create one!</p>
+				) : (
+					<div className="overflow-x-auto">
+						<table className="w-full text-sm text-text-dim">
+							<thead>
+								<tr className="border-b border-border-dim text-xs uppercase tracking-wide text-text-dim">
+									<th className="text-left pb-2 pr-4">Slots</th>
+									<th className="text-left pb-2 pr-4">Time</th>
+									<th className="text-left pb-2 pr-4">Mode</th>
+									<th className="text-left pb-2 pr-4">Team 1</th>
+									<th className="text-left pb-2 pr-4">Team 2</th>
+									<th className="text-left pb-2">Rating Range</th>
 								</tr>
-							)}
-						</tbody>
-					</table>
-				</div>
+							</thead>
+							<tbody>
+								{this.props.displayedGames.map((game, index) => (
+									<tr
+										key={index}
+										onClick={() => this.addPlayer(game)}
+										className="border-b border-border-dim hover:bg-bg-hover cursor-pointer transition-colors"
+									>
+										<td className="py-2 pr-4">{getSlots(game)}</td>
+										<td className="py-2 pr-4 text-text-main font-medium">{game.minutes}+{game.increment}</td>
+										<td className="py-2 pr-4">
+											<span className={`px-1.5 py-0.5 rounded text-xs font-medium ${game.mode === 'Rated' ? 'bg-accent-blue/20 text-accent-blue' : 'bg-bg-panel text-text-dim'}`}>
+												{game.mode}
+											</span>
+										</td>
+										<td className="py-2 pr-4">
+											<div className="text-xs leading-5">
+												<div className={game.player1.id === null ? 'text-green-500' : 'text-text-main'}>{formatPlayer(game.player1, game)}</div>
+												<div className={game.player4.id === null ? 'text-green-500' : 'text-text-dim'}>{formatPlayer(game.player4, game)}</div>
+											</div>
+										</td>
+										<td className="py-2 pr-4">
+											<div className="text-xs leading-5">
+												<div className={game.player2.id === null ? 'text-green-500' : 'text-text-main'}>{formatPlayer(game.player2, game)}</div>
+												<div className={game.player3.id === null ? 'text-green-500' : 'text-text-dim'}>{formatPlayer(game.player3, game)}</div>
+											</div>
+										</td>
+										<td className="py-2 text-xs">{formatRange(game)}</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
 			</div>
 		);
 		/* eslint-enable jsx-a11y/no-static-element-interactions */

@@ -3,7 +3,6 @@ import { Router, Route, browserHistory } from 'react-router';
 import axios from 'axios';
 import _ from 'lodash';
 import NotificationSystem from 'react-notification-system';
-import HomeComponent from './home/HomeComponent';
 import AboutComponent from './about/AboutComponent';
 import ResetContainer from '../containers/reset/ResetContainer';
 import RegisterContainer from '../containers/register/RegisterContainer';
@@ -11,6 +10,8 @@ import LeaderboardContainer from '../containers/leaderboard/LeaderboardContainer
 import LoadingContainer from '../containers/game/LoadingContainer';
 import GameContainer from '../containers/game/GameContainer';
 import ProfileContainer from '../containers/profile/ProfileContainer';
+import LocalGameSetupContainer from '../containers/home/LocalGameSetupContainer';
+import GameHistoryComponent from './home/GameHistoryComponent';
 
 export default class RouteComponent extends React.Component {
 	constructor(props) {
@@ -102,7 +103,9 @@ export default class RouteComponent extends React.Component {
 					<Route path="/leaderboard" component={LeaderboardContainer} />
 					<Route path="/loading" component={LoadingContainer} onEnter={this.requireAboutToPlay} />
 					<Route path="/game/*" component={GameContainer} onEnter={this.requireGame} />
-					<Route path="*" component={HomeComponent} onEnter={this.enterHomeComponent} />
+					<Route path="/local" component={LocalGameSetupContainer} onEnter={this.enterHomeComponent} />
+					<Route path="/history" component={GameHistoryComponent} />
+					<Route path="*" onEnter={() => browserHistory.push("/local")} />
 				</Router>
 			</div>
 		);

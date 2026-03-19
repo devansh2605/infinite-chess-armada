@@ -1,10 +1,20 @@
 <html>
 <head>
 	<meta charset="utf-8">
-	<title>Bughouse Chess</title>
+	<title>Infinite Chess Armada</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
 	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css"/>
+	<script src="https://cdn.tailwindcss.com"></script>
+	<script>
+		tailwind.config = {
+			theme: { extend: { colors: {
+				'bg-base':'#0f0f0f','bg-card':'#1a1a1a','bg-panel':'#262626',
+				'bg-hover':'#2e2e2e','border-dim':'#3d3d3d',
+				'accent':'#f97316','accent-blue':'#3b82f6',
+				'text-main':'#e2e8f0','text-dim':'#94a3b8','gold':'#bf811d'
+			}}}
+		}
+	</script>
 	<link rel="stylesheet" type="text/css" href="/app/static/css/chessground.css">
 	<link rel="stylesheet" type="text/css" href="/app/static/css/theme.css">
 	<link rel="stylesheet" type="text/css" href="/app/static/css/style.css">

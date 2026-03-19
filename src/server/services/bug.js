@@ -213,8 +213,6 @@ var Bug = function (fen) {
     var reserve_black = [];
     var other_reserve_white = [];
     var other_reserve_black = [];
-    var tmp_reserve_white = [];
-    var tmp_reserve_black = [];
     var promoted_piece_squares = [];
 
     /* if the user passes in a fen string, load it, else default to
@@ -829,49 +827,22 @@ var Bug = function (fen) {
                 }
             }
         }
-        /* check if dropping piece from reserve is legal */
-        if (turn === 'w') {
-            if (reserve_white.length > 0) {
-                for (var i = 0; i < reserve_white.length; i++) {
-                    for (var j = first_sq; j <= last_sq; j++) {
-                        /* did we run off the end of the board */
-                        if (j & 0x88) {
-                            j += 7;
-                            continue;
-                        }
-                        var piece = reserve_white[i];
-                        for (var key in SQUARES) {
-                            if (SQUARES.hasOwnProperty(key) && SQUARES[key] == j) {
-                                var square = key;
-                            }
-                        }
-                        /* check if there if square is empty */
-                        if (get(square) == null && !((piece.type == 'p') && (square.charAt(1) == 1 || square.charAt(1) == 8))) {
-                            moves.push(build_drop_move(board, square, square, BITS.DROP_RESERVE, piece));
-                        }
-                    }
-                }
-            }
-        } else {
-            if (reserve_black.length > 0) {
-                for (var i = 0; i < reserve_black.length; i++) {
-                    for (var j = first_sq; j <= last_sq; j++) {
-                        /* did we run off the end of the board */
-                        if (j & 0x88) {
-                            j += 7;
-                            continue;
-                        }
-                        var piece = reserve_black[i];
-                        for (var key in SQUARES) {
-                            if (SQUARES.hasOwnProperty(key) && SQUARES[key] == j) {
-                                var square = key;
-                            }
-                        }
-                        /* check if there if square is empty */
-                        if (get(square) == null && !((piece.type == 'p') && (square.charAt(1) == 1 || square.charAt(1) == 8))) {
-                            //add_move(board, moves, square, square, BITS.DROP_RESERVE);
-                            moves.push(build_drop_move(board, square, square, BITS.DROP_RESERVE, piece));
-                        }
+        /* generate drop moves from reserve (deduplicated by piece type) */
+        if (!single_square) {
+            var reserve = (turn === WHITE) ? reserve_white : reserve_black;
+            if (reserve.length > 0) {
+                var seen_types = {};
+                for (var i = 0; i < reserve.length; i++) {
+                    var rp = reserve[i];
+                    if (seen_types[rp.type]) continue;
+                    seen_types[rp.type] = true;
+                    for (var j = SQUARES.a8; j <= SQUARES.h1; j++) {
+                        if (j & 0x88) { j += 7; continue; }
+                        if (board[j] != null) continue;
+                        var sq_alg = algebraic(j);
+                        var sq_rank = sq_alg.charAt(1);
+                        if (rp.type === PAWN && (sq_rank === '1' || sq_rank === '8')) continue;
+                        moves.push(build_drop_move(board, sq_alg, sq_alg, BITS.DROP_RESERVE, rp));
                     }
                 }
             }
@@ -1029,22 +1000,9 @@ var Bug = function (fen) {
             }
         }
 
-        for (var i = 0; i < reserve_white.length; i++) {
-            if (typeof reserve_white[i] === 'undefined') {
-                if (reserve_white[i].piece.type === BISHOP) {
-                    bishops.push(sq_color);
-                }
-                num_pieces++;
-            }
-        }
-
-        for (var i = 0; i < reserve_black.length; i++) {
-            if (typeof reserve_black[i] === 'undefined') {
-                if (reserve_black[i].piece.type === BISHOP) {
-                    bishops.push(sq_color);
-                }
-                num_pieces++;
-            }
+        /* in bughouse, if either side has reserve pieces, material is sufficient */
+        if (reserve_white.length > 0 || reserve_black.length > 0) {
+            return false;
         }
 
         /* k vs. k */
@@ -1118,7 +1076,9 @@ var Bug = function (fen) {
             },
             ep_square: ep_square,
             half_moves: half_moves,
-            move_number: move_number
+            move_number: move_number,
+            reserve_white: reserve_white.map(function(p) { return {type: p.type, color: p.color}; }),
+            reserve_black: reserve_black.map(function(p) { return {type: p.type, color: p.color}; })
         });
     }
 
@@ -1127,13 +1087,22 @@ var Bug = function (fen) {
         var them = swap_color(us);
         push(move);
 
+        /* drop from reserve — handle separately and return early */
+        if (move.flags & BITS.DROP_RESERVE) {
+            var sq = SQUARES[move.to];
+            board[sq] = {type: move.piece.type, color: move.piece.color};
+            removePieceFromReserve(move.piece);
+            half_moves = 0;
+            ep_square = EMPTY;
+            if (turn === BLACK) {
+                move_number++;
+            }
+            turn = swap_color(turn);
+            return;
+        }
+
         board[move.to] = board[move.from];
         board[move.from] = null;
-
-        /* drop from reserve */
-        if (move.flags & BITS.DROP_RESERVE) {
-            dropPieceFromReserve(move.piece, move.to);
-        }
 
         /* if ep capture, remove the captured pawn */
         if (move.flags & BITS.EP_CAPTURE) {
@@ -1234,6 +1203,14 @@ var Bug = function (fen) {
         ep_square = old.ep_square;
         half_moves = old.half_moves;
         move_number = old.move_number;
+        reserve_white = old.reserve_white;
+        reserve_black = old.reserve_black;
+
+        /* undo drop from reserve — just clear the square */
+        if (move.flags & BITS.DROP_RESERVE) {
+            board[SQUARES[move.to]] = null;
+            return move;
+        }
 
         var us = turn;
         var them = swap_color(turn);
@@ -1243,15 +1220,6 @@ var Bug = function (fen) {
             board[move.from].type = move.piece; // to undo any promotions
         }
         board[move.to] = null;
-
-        /* undo drop from reserve */
-        if (move.flags & BITS.DROP_RESERVE) {
-            move.piece.color === 'w' ? reserve_white.push({
-                type: move.piece.type,
-                color: WHITE
-            }) : reserve_black.push({type: move.piece.type, color: BLACK});
-            board[SQUARES[move.to]] = null;
-        }
 
         if (move.flags & BITS.CAPTURE) {
             board[move.to] = {
@@ -1889,9 +1857,6 @@ var Bug = function (fen) {
              *         promotion: 'q',
              *      })
              */
-            tmp_reserve_white = reserve_white;
-            tmp_reserve_black = reserve_black;
-            var currFEN = generate_fen();
             var move_obj = null;
             var moves = generate_moves();
 
@@ -1909,7 +1874,10 @@ var Bug = function (fen) {
             } else if (typeof move === 'object') {
                 /* convert the pretty move object to an ugly move object */
                 for (var i = 0, len = moves.length; i < len; i++) {
-                    if (move.from === algebraic(moves[i].from) && move.to === algebraic(moves[i].to) && (!('promotion' in moves[i]) || move.promotion === moves[i].promotion)) {
+                    /* for drop moves, from/to are algebraic strings already */
+                    var moveFrom = (moves[i].flags & BITS.DROP_RESERVE) ? moves[i].from : algebraic(moves[i].from);
+                    var moveTo = (moves[i].flags & BITS.DROP_RESERVE) ? moves[i].to : algebraic(moves[i].to);
+                    if (move.from === moveFrom && move.to === moveTo && (!('promotion' in moves[i]) || move.promotion === moves[i].promotion)) {
                         move_obj = moves[i];
                         break;
                     }
@@ -1918,22 +1886,17 @@ var Bug = function (fen) {
 
             /* failed to find move */
             if (!move_obj) {
-                load(currFEN);
-                reserve_white = tmp_reserve_white;
-                reserve_black = tmp_reserve_black;
                 return null;
             }
 
-            /* need to make a copy of move because we can't generate SAN after the
-             * move is made
-             */
+            /* generate SAN before making the move (make_pretty uses make/undo internally
+             * which is now fully reversible via snapshot-based undo) */
             var pretty_move = make_pretty(move_obj);
-            load(currFEN);
-            reserve_white = tmp_reserve_white;
-            reserve_black = tmp_reserve_black;
             make_move(move_obj);
 
-            var targetInPromotedPieceSquares = promoted_piece_squares.includes(algebraic(move_obj.to));
+            /* handle capture transfer to partner's reserve */
+            var targetSquare = (move_obj.flags & BITS.DROP_RESERVE) ? move_obj.to : algebraic(move_obj.to);
+            var targetInPromotedPieceSquares = promoted_piece_squares.includes(targetSquare);
             if (move_obj.captured) {
                 if (move_obj.color == 'w') {
                     if (targetInPromotedPieceSquares) {
@@ -1985,6 +1948,46 @@ var Bug = function (fen) {
             }
 
             return null;
+        },
+
+        /* accessor for internal board array (read-only copy) */
+        getBoard: function () {
+            var result = [];
+            for (var i = SQUARES.a8; i <= SQUARES.h1; i++) {
+                if (i & 0x88) { i += 7; continue; }
+                var sq = algebraic(i);
+                var piece = board[i];
+                result.push({
+                    square: sq,
+                    index: i,
+                    piece: piece ? {type: piece.type, color: piece.color} : null
+                });
+            }
+            return result;
+        },
+
+        getKingSquare: function (color) {
+            return kings[color] !== EMPTY ? algebraic(kings[color]) : null;
+        },
+
+        isAttacked: function (square, byColor) {
+            if (square in SQUARES) {
+                return attacked(byColor, SQUARES[square]);
+            }
+            return false;
+        },
+
+        /* internal make/unmake exposed for search use */
+        makeMove: function (move) {
+            make_move(move);
+        },
+
+        undoMove: function () {
+            return undo_move();
+        },
+
+        generateMoves: function (options) {
+            return generate_moves(options);
         },
 
         history: function (options) {

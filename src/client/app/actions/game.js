@@ -11,6 +11,7 @@ export const UPDATE_DISPLAY_RESIGN_CHOICE = 'UPDATE_DISPLAY_RESIGN_CHOICE';
 export const UPDATE_DISPLAY_DRAW_CHOICE = 'UPDATE_DISPLAY_DRAW_CHOICE';
 export const UPDATE_GAME_TERMINATION = 'UPDATE_GAME_TERMINATION';
 export const RESET_GAME_STATE = 'RESET_GAME_STATE';
+export const SET_LOCAL_MODE = 'SET_LOCAL_MODE';
 
 export function updateMoves(moves) {
 	return { type: UPDATE_MOVES, moves };
@@ -53,8 +54,26 @@ export function resetGameState() {
 	return { type: RESET_GAME_STATE };
 }
 
+export function setLocalMode(playerTokens, enginePlayers) {
+	return { type: SET_LOCAL_MODE, playerTokens, enginePlayers };
+}
+
+export function createLocalGame(postData) {
+	return dispatch => axios.post('/api/games/local', postData)
+		.then(response => {
+			dispatch(setLocalMode(response.data.playerTokens, response.data.enginePlayers));
+			dispatch(receiveIsPlaying(true));
+			browserHistory.push(`/game/${response.data.id}`);
+		});
+}
+
 export function updateIsPlaying(gameID) {
-	return dispatch => {
+	return (dispatch, getState) => {
+		const state = getState();
+		if (state.game.localMode) {
+			dispatch(receiveIsPlaying(true));
+			return;
+		}
 		axios.put(`/api/games/userIsPlayingOrObserving/${gameID}`, { token: localStorage.getItem('token') },
 			{ validateStatus: status => (status >= 200 && status < 300) || (status === 401 || status === 403) })
 			.then(response => {
@@ -67,9 +86,12 @@ export function updateIsPlaying(gameID) {
 export function getGameInfo(id) {
 	return (dispatch, getState) => {
 		const state = getState();
-		axios.put(`/api/games/withUsers/${state.lobby.selectedGame.id || id}`, { token: localStorage.getItem('token') })
+		const token = state.game.localMode ? state.game.playerTokens.player1Token : localStorage.getItem('token');
+		const gameId = state.lobby.selectedGame.id || id;
+		axios.put(`/api/games/withUsers/${gameId}`, { token })
 			.then(response => {
-				dispatch(receiveGameInfo(response.data, response.data.userPosition));
+				const userPosition = state.game.localMode ? 1 : response.data.userPosition;
+				dispatch(receiveGameInfo(response.data, userPosition));
 			});
 	};
 }

@@ -16,7 +16,10 @@ const defaultState = {
 	},
 	pieceToDragFromReserve: {},
 	displayResignChoice: false,
-	displayDrawChoice: false
+	displayDrawChoice: false,
+	localMode: false,
+	playerTokens: null,
+	enginePlayers: null
 };
 
 export default function user(state = defaultState, action) {
@@ -27,7 +30,7 @@ export default function user(state = defaultState, action) {
 				isPlaying: action.isPlaying
 			};
 		case gameActions.UPDATE_MOVES:
-			return _.merge({}, state, action.moves);
+			return { ...state, moves: action.moves };
 		case gameActions.UPDATE_CLOCKS:
 			return {
 				...state,
@@ -65,6 +68,14 @@ export default function user(state = defaultState, action) {
 			return {
 				...state,
 				gameTermination: action.gameTermination
+			};
+		}
+		case gameActions.SET_LOCAL_MODE: {
+			return {
+				...state,
+				localMode: true,
+				playerTokens: action.playerTokens,
+				enginePlayers: action.enginePlayers || null
 			};
 		}
 		case gameActions.RECEIVE_GAME_INFO: {

@@ -1,9 +1,7 @@
 import React from 'react';
 import axios from 'axios';
-import { Button } from 'react-bootstrap';
 import { browserHistory } from 'react-router';
 import { socketLobby } from '../../socket';
-import './css/loading.css';
 
 export default class LoadingComponent extends React.Component {
 	constructor(props) {
@@ -16,7 +14,6 @@ export default class LoadingComponent extends React.Component {
 	}
 
 	componentWillUnmount() {
-		// User is manually navigating away
 		if (this.props.userWaitingForGameToStart) {
 			this.handleUserLeaveGame();
 		}
@@ -36,14 +33,20 @@ export default class LoadingComponent extends React.Component {
 
 	render() {
 		return (
-			<div>
-				<div className="spinner-animation">
-					<div className="spinner-outer-circle" />
-					<div className="spinner-inner-circle" />
+			<div className="flex flex-col items-center justify-center min-h-screen bg-bg-base gap-6">
+				{/* Spinner */}
+				<div className="relative w-20 h-20">
+					<div className="absolute inset-0 rounded-full border-4 border-bg-panel" />
+					<div className="absolute inset-0 rounded-full border-4 border-t-accent animate-spin" />
+					<div className="absolute inset-2 rounded-full border-4 border-r-accent-blue animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }} />
 				</div>
-				<br /><br /><br />
-				<h3 className="spinner-text">Waiting for other players to join the game...</h3>
-				<Button bsClass="btn btn-secondary cancel-button" onClick={this.handleUserLeaveGame}>Cancel game</Button>
+				<p className="text-text-dim text-sm">Waiting for other players to join...</p>
+				<button
+					onClick={this.handleUserLeaveGame}
+					className="px-5 py-2 rounded border border-border-dim text-text-dim text-sm hover:border-red-500 hover:text-red-400 transition-colors"
+				>
+					Cancel game
+				</button>
 			</div>
 		);
 	}

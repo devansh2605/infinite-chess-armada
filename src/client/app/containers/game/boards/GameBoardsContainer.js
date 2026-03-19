@@ -7,10 +7,12 @@ import {
 	updatePieceToDragFromReserve,
 	updateDisplayResignChoice,
 	updateDisplayDrawChoice,
-	updateGameTermination } from '../../../actions/game';
+	updateGameTermination,
+	resetGameState } from '../../../actions/game';
 
 function mapStateToProps(state) {
-	const userPosition = state.game.userPosition;
+	const localMode = state.game.localMode;
+	const userPosition = localMode ? 1 : state.game.userPosition;
 	const game = state.game.game;
 	const display = {};
 	if (userPosition === 1) {
@@ -37,7 +39,11 @@ function mapStateToProps(state) {
 	return {
 		game,
 		display,
-		userPosition: state.game.userPosition,
+		userPosition,
+		localMode,
+		playerTokens: state.game.playerTokens,
+		enginePlayers: state.game.enginePlayers,
+		gameTermination: state.game.gameTermination,
 		moves: state.game.moves,
 		clocks: state.game.clocks,
 		pieceToDragFromReserve: state.game.pieceToDragFromReserve,
@@ -53,7 +59,8 @@ function mapDispatchToProps(dispatch) {
 		updatePieceToDragFromReserve: piece => dispatch(updatePieceToDragFromReserve(piece)),
 		updateDisplayResignChoice: display => dispatch(updateDisplayResignChoice(display)),
 		updateDisplayDrawChoice: display => dispatch(updateDisplayDrawChoice(display)),
-		updateGameTermination: gameTermination => dispatch(updateGameTermination(gameTermination))
+		updateGameTermination: gameTermination => dispatch(updateGameTermination(gameTermination)),
+		resetGameState: () => dispatch(resetGameState())
 	};
 }
 

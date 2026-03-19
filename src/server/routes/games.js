@@ -1,11 +1,83 @@
 const express = require('express');
 const Game = require('../models/Game');
+const User = require('../models/User');
 const Bug = require('../services/bug');
 const jwt = require('jsonwebtoken');
 const validate = require('jsonschema').validate;
 const secretToken = require('../config').secretToken;
+const engineManager = require('../services/engineManager');
 
 const router = express.Router();
+
+/* Create a local game with all 4 players */
+router.post('/local', async (req, res) => {
+	const validReq = {
+		type: 'object',
+		required: ['player1', 'player2', 'player3', 'player4', 'minutes', 'increment', 'token'],
+		properties: {
+			player1: { type: 'integer' },
+			player2: { type: 'integer' },
+			player3: { type: 'integer' },
+			player4: { type: 'integer' },
+			minutes: { type: 'integer' },
+			increment: { type: 'integer' },
+			token: { type: 'string' }
+		}
+	};
+	try {
+		if (!validate(req.body, validReq).valid
+			|| req.body.minutes < 1 || req.body.minutes > 20
+			|| req.body.increment < 0 || req.body.increment > 30) {
+			return res.sendStatus(400);
+		}
+		const decoded = jwt.verify(req.body.token, secretToken);
+		if (decoded.id !== req.body.player1 && decoded.id !== req.body.player2
+			&& decoded.id !== req.body.player3 && decoded.id !== req.body.player4) {
+			return res.sendStatus(400);
+		}
+
+		const id = await Game.createLocalGame(
+			req.body.player1, req.body.player2,
+			req.body.player3, req.body.player4,
+			req.body.minutes, req.body.increment
+		);
+
+		const [user1, user2, user3, user4] = await Promise.all([
+			User.getByID(req.body.player1),
+			User.getByID(req.body.player2),
+			User.getByID(req.body.player3),
+			User.getByID(req.body.player4)
+		]);
+
+		const playerTokens = {
+			player1Token: jwt.sign(JSON.parse(JSON.stringify(user1)), secretToken, { expiresIn: '7 days' }),
+			player2Token: jwt.sign(JSON.parse(JSON.stringify(user2)), secretToken, { expiresIn: '7 days' }),
+			player3Token: jwt.sign(JSON.parse(JSON.stringify(user3)), secretToken, { expiresIn: '7 days' }),
+			player4Token: jwt.sign(JSON.parse(JSON.stringify(user4)), secretToken, { expiresIn: '7 days' })
+		};
+
+		// Register engine players if any
+		const ep = req.body.enginePlayers || {};
+		const esl = req.body.engineSkillLevels || {};
+		const enginePlayers = {
+			1: !!ep[1], 2: !!ep[2], 3: !!ep[3], 4: !!ep[4]
+		};
+		const engineSkillLevels = {
+			1: Math.min(10, Math.max(1, parseInt(esl[1]) || 5)),
+			2: Math.min(10, Math.max(1, parseInt(esl[2]) || 5)),
+			3: Math.min(10, Math.max(1, parseInt(esl[3]) || 5)),
+			4: Math.min(10, Math.max(1, parseInt(esl[4]) || 5))
+		};
+		const hasEngines = enginePlayers[1] || enginePlayers[2] || enginePlayers[3] || enginePlayers[4];
+		if (hasEngines) {
+			engineManager.registerGame(id, enginePlayers, engineSkillLevels);
+		}
+
+		res.json({ id, playerTokens, enginePlayers });
+	} catch (err) {
+		res.status(400).send({ error: 'Failed to create local game' });
+	}
+});
 
 /* Create a new game */
 router.post('/', async (req, res) => {
@@ -297,6 +369,61 @@ router.put('/validate/pawnpromotion/:id', async (req, res) => {
 		}
 	} catch (err) {
 		res.status(400).send({ error: 'Failed to validate pawn promotion' });
+	}
+});
+
+router.get('/history', async (_req, res) => {
+	try {
+		const games = await Game.getRecentCompleted(30);
+		res.json(games);
+	} catch (err) {
+		res.status(500).json({ error: 'Failed to fetch game history' });
+	}
+});
+
+/* GET all paused games */
+router.get('/paused', async (_req, res) => {
+	try {
+		const games = await Game.getPausedGames();
+		res.json(games);
+	} catch (err) {
+		res.status(500).json({ error: 'Failed to fetch paused games' });
+	}
+});
+
+/* POST pause a game — saves elapsed clock time, sets status=paused */
+router.post('/pause/:id', async (req, res) => {
+	try {
+		const game = await Game.getByID(req.params.id);
+		if (game.status !== 'playing') return res.sendStatus(400);
+		const clocks = game.clocks.split(',').map(Number);
+		const now = Date.now();
+		if (game.left_last_time) {
+			const elapsed = now - parseInt(game.left_last_time);
+			if (game.left_color_to_play === 'white') clocks[0] += elapsed;
+			else clocks[1] += elapsed;
+		}
+		if (game.right_last_time) {
+			const elapsed = now - parseInt(game.right_last_time);
+			if (game.right_color_to_play === 'white') clocks[2] += elapsed;
+			else clocks[3] += elapsed;
+		}
+		await Game.pauseGame(req.params.id, clocks);
+		res.sendStatus(200);
+	} catch (err) {
+		res.status(500).json({ error: 'Failed to pause game' });
+	}
+});
+
+/* POST resume a paused game */
+router.post('/resume/:id', async (req, res) => {
+	try {
+		const game = await Game.getByID(req.params.id);
+		if (game.status !== 'paused') return res.sendStatus(400);
+		await Game.resumeGame(req.params.id);
+		res.sendStatus(200);
+	} catch (err) {
+		res.status(500).json({ error: 'Failed to resume game' });
 	}
 });
 

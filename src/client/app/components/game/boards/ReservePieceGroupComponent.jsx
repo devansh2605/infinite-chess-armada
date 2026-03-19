@@ -14,19 +14,19 @@ export default function ReservePieceGroupComponent(props) {
 			{ props.reserveColor === 'white' ?
 				(
 					<div>
-						<ReservePieceContainer piece="wP" canDrag={props.canDrag} pieceNum={props.pieceNums.pawn} />
-						<ReservePieceContainer piece="wN" canDrag={props.canDrag} pieceNum={props.pieceNums.knight} />
-						<ReservePieceContainer piece="wB" canDrag={props.canDrag} pieceNum={props.pieceNums.bishop} />
-						<ReservePieceContainer piece="wR" canDrag={props.canDrag} pieceNum={props.pieceNums.rook} />
-						<ReservePieceContainer piece="wQ" canDrag={props.canDrag} pieceNum={props.pieceNums.queen} />
+						<ReservePieceContainer piece="wP" canDrag={props.canDrag} pieceNum={props.pieceNums.pawn} boardId={props.boardId} />
+						<ReservePieceContainer piece="wN" canDrag={props.canDrag} pieceNum={props.pieceNums.knight} boardId={props.boardId} />
+						<ReservePieceContainer piece="wB" canDrag={props.canDrag} pieceNum={props.pieceNums.bishop} boardId={props.boardId} />
+						<ReservePieceContainer piece="wR" canDrag={props.canDrag} pieceNum={props.pieceNums.rook} boardId={props.boardId} />
+						<ReservePieceContainer piece="wQ" canDrag={props.canDrag} pieceNum={props.pieceNums.queen} boardId={props.boardId} />
 					</div>
 				) : (
 					<div>
-						<ReservePieceContainer piece="bP" canDrag={props.canDrag} pieceNum={props.pieceNums.pawn} />
-						<ReservePieceContainer piece="bN" canDrag={props.canDrag} pieceNum={props.pieceNums.knight} />
-						<ReservePieceContainer piece="bB" canDrag={props.canDrag} pieceNum={props.pieceNums.bishop} />
-						<ReservePieceContainer piece="bR" canDrag={props.canDrag} pieceNum={props.pieceNums.rook} />
-						<ReservePieceContainer piece="bQ" canDrag={props.canDrag} pieceNum={props.pieceNums.queen} />
+						<ReservePieceContainer piece="bP" canDrag={props.canDrag} pieceNum={props.pieceNums.pawn} boardId={props.boardId} />
+						<ReservePieceContainer piece="bN" canDrag={props.canDrag} pieceNum={props.pieceNums.knight} boardId={props.boardId} />
+						<ReservePieceContainer piece="bB" canDrag={props.canDrag} pieceNum={props.pieceNums.bishop} boardId={props.boardId} />
+						<ReservePieceContainer piece="bR" canDrag={props.canDrag} pieceNum={props.pieceNums.rook} boardId={props.boardId} />
+						<ReservePieceContainer piece="bQ" canDrag={props.canDrag} pieceNum={props.pieceNums.queen} boardId={props.boardId} />
 					</div>
 				)
 			}

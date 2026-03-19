@@ -15,7 +15,8 @@ export default class ReservePieceComponent extends React.Component {
 		const rolesMapping = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen' };
 		const pieceToDrag = {
 			role: rolesMapping[this.props.piece.charAt(1).toLowerCase()],
-			color: this.props.piece.charAt(0) === 'w' ? 'white' : 'black'
+			color: this.props.piece.charAt(0) === 'w' ? 'white' : 'black',
+			boardId: this.props.boardId
 		};
 		this.props.updatePieceToDragFromReserve(pieceToDrag);
 	}

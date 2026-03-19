@@ -7,7 +7,9 @@ function mapStateToProps(state) {
 		id: state.game.game.id,
 		userPosition: state.game.userPosition,
 		displayResignChoice: state.game.displayResignChoice,
-		displayDrawChoice: state.game.displayDrawChoice
+		displayDrawChoice: state.game.displayDrawChoice,
+		localMode: state.game.localMode,
+		playerTokens: state.game.playerTokens
 	};
 }
 

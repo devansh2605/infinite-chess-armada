@@ -1,10 +1,11 @@
 export default class Clock {
-	constructor(minutes, increment, gameSocket, gameId) {
+	constructor(minutes, increment, gameSocket, gameId, tokenGetter) {
 		this.duration = minutes;
 		this.minutes = minutes;
 		this.increment = increment;
 		this.gameSocket = gameSocket;
 		this.gameId = gameId;
+		this.tokenGetter = tokenGetter || (() => localStorage.getItem('token'));
 		this.intervalStartTime = null;
 		this.tickFtns = [];
 		this.running = false;
@@ -38,7 +39,7 @@ export default class Clock {
 						that.running = false;
 						that.gameSocket.emit('time out', {
 							id: that.gameId,
-							token: localStorage.getItem('token')
+							token: that.tokenGetter()
 						});
 					}
 					const obj = that.parse(diff);

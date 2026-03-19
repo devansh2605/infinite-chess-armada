@@ -10,7 +10,7 @@ const logger = require('./logger');
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
-app.use(favicon(path.join(__dirname, '..', 'client', 'favicon.ico')));
+app.use(favicon(path.join(__dirname, '..', 'client', 'favicon.png')));
 app.use(express.static(path.join(__dirname, '..', 'client')));
 
 const users = require('./routes/users');
@@ -23,7 +23,11 @@ app.use('/api/games', games);
 app.use('/api/login', login);
 app.use('/api/leaderboard', leaderboard);
 
-app.get('\\/|about|user|leaderboard|register|reset|loading|game/*', (req, res) => {
+app.get('/', (req, res) => {
+	res.redirect('/local');
+});
+
+app.get('/about|/user/*|/leaderboard|/register|/reset/*|/loading|/game/*|/local|/history/*', (req, res) => {
 	res.sendFile(path.resolve(__dirname, '..', 'client', 'index.html'));
 });
 

@@ -1,7 +1,6 @@
 import React from 'react';
 import GameActionsPanelContainer from '../../../containers/game/sidebar/GameActionsPanelContainer';
 import UserLinkComponent from '../../common/UserLinkComponent';
-import './css/gameInfoPanel.css';
 
 export default class GameInfoPanelComponent extends React.Component {
 	constructor(props) {
@@ -10,44 +9,56 @@ export default class GameInfoPanelComponent extends React.Component {
 	}
 
 	getInfoFormat() {
+		const { minutes, increment, mode } = this.props.game;
 		let speed;
-		if (this.props.game.minutes < 3) speed = 'Bullet';
-		else if (this.props.game.minutes >= 3 && this.props.game.minutes <= 8) speed = 'Blitz';
+		if (minutes < 3) speed = 'Bullet';
+		else if (minutes <= 8) speed = 'Blitz';
 		else speed = 'Classical';
-		return `${this.props.game.minutes}+${this.props.game.increment}, ${speed}, ${this.props.game.mode}`;
+		return `${minutes}+${increment} · ${speed} · ${mode}`;
 	}
 
 	render() {
+		const { game, gameTermination, isPlaying } = this.props;
 		return (
-			<div className="game-info-panel-container">
-				<h4>{this.getInfoFormat()}</h4>
-				<div>
-					<img src="/app/static/img/pieces/wK.svg" alt="White" width="20px" height="20px" />
-					<span className="align-player-info player-separation">
-						<UserLinkComponent user={this.props.game.player1} rating={this.props.game.player1.rating} />
-					</span>
-					<img src="/app/static/img/pieces/bK.svg" alt="Black" width="20px" height="20px" />
-					<span className="align-player-info">
-						<UserLinkComponent user={this.props.game.player4} rating={this.props.game.player4.rating} />
-					</span>
-					<p className="versus">versus</p>
-					<img src="/app/static/img/pieces/bK.svg" alt="Black" width="20px" height="20px" />
-					<span className="align-player-info player-separation">
-						<UserLinkComponent user={this.props.game.player2} rating={this.props.game.player2.rating} />
-					</span>
-					<img src="/app/static/img/pieces/wK.svg" alt="White" width="20px" height="20px" />
-					<span className="align-player-info">
-						<UserLinkComponent user={this.props.game.player3} rating={this.props.game.player3.rating} />
-					</span>
-				</div>
-				{ this.props.gameTermination ? (
-					<p className="game-termination">
-						{this.props.gameTermination}
-					</p>
-				) : (
-					<div>
-						{ this.props.isPlaying && <GameActionsPanelContainer /> }
+			<div className="p-4 border-b border-border-dim flex-shrink-0">
+				{/* Time control badge */}
+				<div className="text-xs font-medium text-text-dim mb-3">{this.getInfoFormat()}</div>
+
+				{/* Team 1 */}
+				<div className="mb-2">
+					<div className="text-xs uppercase tracking-wide text-accent font-semibold mb-1">Team 1</div>
+					<div className="flex items-center gap-2 text-sm text-text-main">
+						<img src="/app/static/img/pieces/wK.svg" alt="" width="16" height="16" />
+						<UserLinkComponent user={game.player1} />
 					</div>
+					<div className="flex items-center gap-2 text-sm text-text-dim mt-0.5">
+						<img src="/app/static/img/pieces/bK.svg" alt="" width="16" height="16" />
+						<UserLinkComponent user={game.player4} />
+					</div>
+				</div>
+
+				{/* vs */}
+				<div className="text-xs text-text-dim text-center my-1">vs</div>
+
+				{/* Team 2 */}
+				<div className="mb-3">
+					<div className="text-xs uppercase tracking-wide text-accent-blue font-semibold mb-1">Team 2</div>
+					<div className="flex items-center gap-2 text-sm text-text-dim">
+						<img src="/app/static/img/pieces/bK.svg" alt="" width="16" height="16" />
+						<UserLinkComponent user={game.player2} />
+					</div>
+					<div className="flex items-center gap-2 text-sm text-text-main mt-0.5">
+						<img src="/app/static/img/pieces/wK.svg" alt="" width="16" height="16" />
+						<UserLinkComponent user={game.player3} />
+					</div>
+				</div>
+
+				{gameTermination ? (
+					<div className="bg-bg-panel border border-border-dim rounded px-3 py-2 text-text-main text-xs font-medium">
+						{gameTermination}
+					</div>
+				) : (
+					isPlaying && <GameActionsPanelContainer />
 				)}
 			</div>
 		);

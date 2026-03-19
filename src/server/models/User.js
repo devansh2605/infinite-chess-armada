@@ -187,6 +187,11 @@ class User {
 		await db.none(sqlFile('user/update_password_clear_rest_token.sql'), { id, passwordHash });
 	}
 
+	static async getAll() {
+		const rows = await db.any('SELECT id, username, title FROM users ORDER BY username');
+		return rows;
+	}
+
 	async insert() {
 		const user = this;
 		if (user.id !== undefined) {

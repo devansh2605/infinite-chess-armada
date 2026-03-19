@@ -7,6 +7,16 @@ const validate = require('jsonschema').validate;
 
 const router = express.Router();
 
+/* GET all users (for local game setup dropdown) */
+router.get('/', async (req, res, next) => {
+	try {
+		const users = await User.getAll();
+		res.json(users);
+	} catch (err) {
+		next(err);
+	}
+});
+
 /* GET a specific user by id */
 router.get('/:user_id', async (req, res, next) => {
 	const validReq = {

@@ -1,5 +1,6 @@
 import React from 'react';
 import _ from 'lodash';
+import { Link } from 'react-router';
 import Slider from 'react-rangeslider';
 import Toggle from 'react-toggle';
 import { Button, ButtonGroup } from 'react-bootstrap';
@@ -130,6 +131,8 @@ export default class CreateGameComponent extends React.Component {
 						<Button bsClass="btn btn-secondary" onClick={() => this.createGame('random')}>Random</Button>
 						<Button bsClass="btn btn-secondary" onClick={() => this.createGame('black')}>Black</Button>
 					</ButtonGroup>
+					<br /><br />
+					<Link to="/local"><Button bsClass="btn btn-secondary">Local Multiplayer</Button></Link>
 				</div>
 				}
 			</div>

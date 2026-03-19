@@ -4,7 +4,8 @@ import ReserveComponent from '../../../components/game/boards/ReserveComponent';
 function mapStateToProps(state) {
 	return {
 		userPosition: state.game.userPosition,
-		reserves: state.game.reserves
+		reserves: state.game.reserves,
+		localMode: state.game.localMode
 	};
 }
 

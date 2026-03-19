@@ -239,6 +239,47 @@ class Game {
 		return id;
 	}
 
+	static async createLocalGame(player1, player2, player3, player4, minutes, increment) {
+		const ratingRange = '0 - 3000';
+		const mode = 'Casual';
+		const joinRandom = false;
+		const status = 'open';
+
+		const users = await Promise.all([
+			User.getByID(player1), User.getByID(player2),
+			User.getByID(player3), User.getByID(player4)
+		]);
+
+		function getRating(user) {
+			if (minutes < 3) return user.ratingBullet;
+			if (minutes >= 3 && minutes <= 8) return user.ratingBlitz;
+			return user.ratingClassical;
+		}
+
+		const rowNumStart = await db.one(sqlFile('game/get_number_games.sql'));
+		const numGamesStart = rowNumStart.count;
+		let numGamesEnd = numGamesStart;
+		let id;
+		while (numGamesStart === numGamesEnd) {
+			id = (Math.random() + 1).toString(36).substr(2, 12);
+			await db.none(sqlFile('game/create_game.sql'), {
+				id, player1, player2, player3, player4,
+				minutes, increment, ratingRange, mode, status, joinRandom,
+				ratingColumnOfFirstPlayer: 'player1_rating',
+				rating: getRating(users[0])
+			});
+			const rowNumEnd = await db.one(sqlFile('game/get_number_games.sql'));
+			numGamesEnd = rowNumEnd.count;
+		}
+
+		await db.none('UPDATE games SET player2_rating = $1, player3_rating = $2, player4_rating = $3 WHERE id = $4',
+			[getRating(users[1]), getRating(users[2]), getRating(users[3]), id]);
+
+		await db.none(sqlFile('game/start_game.sql'), { id });
+
+		return id;
+	}
+
 	/**
 	 * End a game
 	 * @param {Object} game
@@ -248,6 +289,48 @@ class Game {
 	 * @param {Function} clearRoom
 	 * @returns {Promise.<void>}
 	 */
+	static async pauseGame(id, clocksArr) {
+		await db.none(
+			`UPDATE Games SET status='paused', clocks=$1, left_last_time=NULL, right_last_time=NULL WHERE id=$2`,
+			[clocksArr.join(','), id]
+		);
+	}
+
+	static async resumeGame(id) {
+		const now = Date.now();
+		await db.none(
+			`UPDATE Games SET status='playing', left_last_time=$1, right_last_time=$2 WHERE id=$3`,
+			[now, now, id]
+		);
+	}
+
+	static async getPausedGames() {
+		return db.any(`
+			SELECT g.id, g.minutes, g.increment, g.mode, g.clocks,
+			       u1.username p1, u2.username p2, u3.username p3, u4.username p4
+			FROM Games g
+			JOIN Users u1 ON g.player1=u1.id
+			JOIN Users u2 ON g.player2=u2.id
+			JOIN Users u3 ON g.player3=u3.id
+			JOIN Users u4 ON g.player4=u4.id
+			WHERE g.status='paused'
+			ORDER BY g.timestamp DESC
+		`);
+	}
+
+	static async getRecentCompleted(limit = 30) {
+		return db.any(`
+			SELECT g.id, g.minutes, g.increment, g.mode, g.termination, g.timestamp,
+			       u1.username p1, u2.username p2, u3.username p3, u4.username p4
+			FROM Games g
+			JOIN Users u1 ON g.player1=u1.id
+			JOIN Users u2 ON g.player2=u2.id
+			JOIN Users u3 ON g.player3=u3.id
+			JOIN Users u4 ON g.player4=u4.id
+			WHERE g.status='terminated'
+			ORDER BY g.timestamp DESC LIMIT $1`, [limit]);
+	}
+
 	static async endGame(game, termination, socket, gameSocket, clearRoom) {
 		const terminationQueryString = 'UPDATE Games SET termination = $1, status = $2 WHERE id = $3';
 		await db.none(terminationQueryString, [termination, 'terminated', game.id]);

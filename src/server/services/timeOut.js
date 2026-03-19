@@ -1,5 +1,6 @@
 const Game = require('../models/Game');
 const logger = require('../logger');
+const engineManager = require('./engineManager');
 
 /**
  * Check if any user has timed out in a game
@@ -9,7 +10,15 @@ const logger = require('../logger');
 function checkIfTimeOut(game) {
 	const currentTime = Date.now();
 	for (let userPosition = 1; userPosition <= 4; userPosition++) {
-		const diffTime = currentTime - (userPosition === 1 || userPosition === 2 ? game.left_last_time : game.right_last_time);
+		const boardNum = (userPosition === 1 || userPosition === 2) ? 1 : 2;
+		const lastTime = (userPosition === 1 || userPosition === 2) ? game.left_last_time : game.right_last_time;
+
+		// Skip if this board has been drawn (lastTime is null after a draw, or engine manager says so)
+		if (lastTime === null || engineManager.isBoardDrawn(game.id, boardNum)) {
+			continue;
+		}
+
+		const diffTime = currentTime - lastTime;
 		if (diffTime + game.clocks.split(',').map(Number)[userPosition - 1] >= game.minutes * 1000 * 60) {
 			if (userPosition === 1 || userPosition === 4) {
 				return 'Team 1 timed out, Team 2 is victorious';

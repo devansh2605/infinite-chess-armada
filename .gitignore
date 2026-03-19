@@ -1,6 +1,25 @@
-node_modules
-.idea
-*.iml
-/src/client/public/*
+# Dependencies
+node_modules/
+
+# Environment variables (NEVER commit this)
 .env
+.env.local
+.env.*.local
+
+# Built assets
+/src/client/public/*
+
+# Logs
+*.log
 *.txt
+logs/
+log/
+
+# IDE / OS files
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Optional: lock files from other package managers
+yarn.lock

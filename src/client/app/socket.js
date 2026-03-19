@@ -30,21 +30,27 @@ socketLoading.on('start game', id => {
 });
 
 socketGame.on('offer resign', resigningUserPosition => {
-	if (onSameTeam(store.getState().game.userPosition, resigningUserPosition)) {
+	const state = store.getState().game;
+	if (state.localMode) return;
+	if (onSameTeam(state.userPosition, resigningUserPosition)) {
 		store.dispatch(updateDisplayResignChoice(true));
 	}
 });
 
 socketGame.on('offer draw', () => {
+	if (store.getState().game.localMode) return;
 	store.dispatch(updateDisplayDrawChoice(true));
 });
 
 socketGame.on('decline resign', decliningUserPosition => {
-	if (onSameTeam(store.getState().game.userPosition, decliningUserPosition)) {
+	const state = store.getState().game;
+	if (state.localMode) return;
+	if (onSameTeam(state.userPosition, decliningUserPosition)) {
 		store.dispatch(updateDisplayResignChoice(false));
 	}
 });
 
 socketGame.on('decline draw', () => {
+	if (store.getState().game.localMode) return;
 	store.dispatch(updateDisplayDrawChoice(false));
 });

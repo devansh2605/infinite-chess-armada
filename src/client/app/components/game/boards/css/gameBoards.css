@@ -1,6 +1,26 @@
+.boardsWrapper {
+	display: flex;
+	flex-direction: row;
+	justify-content: center;
+	align-items: flex-start;
+	gap: 24px; /* space between left and right columns */
+}
+
+.boardColumn {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	flex: 1 1 0;
+	min-width: 260px;
+	max-width: 650px;
+}
+
 .boardContainer {
-	width: 500px;
-	height: 500px;
+	/* responsive square: scale with viewport but cap at 500px */
+	width: min(44vw, 500px);
+	height: min(44vw, 500px);
+	max-width: 500px;
+	max-height: 500px;
 }
 
 .rightGame {
@@ -11,13 +31,17 @@
 }
 
 .align-reserve-clock-bottom {
-	width: 500px;
+	width: 100%;
+	max-width: 500px;
 	height: 78px;
 	margin-left: 0;
 }
 
 .align-reserve-clock-top {
-	width: 500px;
+	width: 100%;
+	max-width: 500px;
+	height: 78px;
+	overflow: hidden;
 	margin-left: 0;
 	padding-left: 0;
 	padding-right: 0;
@@ -28,11 +52,14 @@
 }
 
 .right-game-top-username {
-	float: right;
+	text-align: right;
+	display: block;
+	overflow: hidden;
 }
 
 .right-game-bottom-username {
-	float: right;
+	text-align: right;
+	display: block;
 	margin-top: 10px;
 }
 
@@ -70,14 +97,13 @@
 	float: left;
 	width: 132px;
 	height: 63px;
-	margin-bottom: 15px;
+	margin-top: 8px;
 	background-color: #262626;
 	border: 1px solid #3d3d3d;
 	font-size: 38px;
 	color: #ABABAB;
 	text-align: center;
 	line-height: 62px;
-	transform: translateY(+62%);
 	user-select: none;
 	cursor: default;
 }
@@ -135,6 +161,18 @@
 }
 
 #blackPromotion {
+	position: absolute;
+	display: none;
+	z-index: 4;
+}
+
+#whitePromotion2 {
+	position: absolute;
+	display: none;
+	z-index: 4;
+}
+
+#blackPromotion2 {
 	position: absolute;
 	display: none;
 	z-index: 4;

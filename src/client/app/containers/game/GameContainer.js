@@ -6,7 +6,10 @@ import GameComponent from '../../components/game/GameComponent';
 function mapStateToProps(state) {
 	return {
 		isPlaying: state.game.isPlaying,
-		renderGameBoards: !_.isEmpty(state.game.game)
+		renderGameBoards: !_.isEmpty(state.game.game),
+		gamePaused: !_.isEmpty(state.game.game) && state.game.game.status === 'paused',
+		gameId: state.game.game && state.game.game.id,
+		localMode: state.game.localMode
 	};
 }
 

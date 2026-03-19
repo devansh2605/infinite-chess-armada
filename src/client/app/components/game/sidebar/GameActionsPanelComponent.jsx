@@ -1,7 +1,5 @@
 import React from 'react';
-import { Button, Glyphicon, Dropdown, MenuItem } from 'react-bootstrap';
 import { socketGame } from '../../../socket';
-import './css/gameActionsPanel.css';
 
 export default class GameActionsPanelComponent extends React.Component {
 	constructor(props) {
@@ -15,7 +13,7 @@ export default class GameActionsPanelComponent extends React.Component {
 		this.emitData = {
 			id: this.props.id,
 			userPosition: this.props.userPosition,
-			token: localStorage.getItem('token')
+			token: this.props.localMode ? this.props.playerTokens.player1Token : localStorage.getItem('token')
 		};
 		this.handleOfferResign = this.handleOfferResign.bind(this);
 		this.handleOfferDraw = this.handleOfferDraw.bind(this);
@@ -26,16 +24,10 @@ export default class GameActionsPanelComponent extends React.Component {
 	}
 
 	componentWillReceiveProps(nextProps) {
-		if (nextProps.displayResignChoice) {
-			this.setState({ resignChoiceDisabled: false });
-		} else {
-			this.setState({ offerResignDisabled: false });
-		}
-		if (nextProps.displayDrawChoice) {
-			this.setState({ drawChoiceDisabled: false });
-		} else {
-			this.setState({ offerDrawDisabled: false });
-		}
+		if (nextProps.displayResignChoice) this.setState({ resignChoiceDisabled: false });
+		else this.setState({ offerResignDisabled: false });
+		if (nextProps.displayDrawChoice) this.setState({ drawChoiceDisabled: false });
+		else this.setState({ offerDrawDisabled: false });
 	}
 
 	handleOfferResign() {
@@ -70,64 +62,85 @@ export default class GameActionsPanelComponent extends React.Component {
 		this.setState({ drawChoiceDisabled: true });
 	}
 
-	render() {
-		let resignPanel = null;
-		let drawPanel = null;
-		let resignDropdownButtonClassName = 'btn-secondary-no-hover';
-		if (!this.state.resignChoiceDisabled) resignDropdownButtonClassName += ' flash-button';
-		let drawDropdownButtonClassName = 'btn-secondary-no-hover';
-		if (!this.state.drawChoiceDisabled) drawDropdownButtonClassName += ' flash-button';
-
+	renderResignPanel() {
 		if (!this.props.displayResignChoice) {
-			resignPanel = (
-				<Button
-					bsClass="btn btn-secondary leftActionButton"
+			return (
+				<button
 					onClick={this.handleOfferResign}
 					disabled={this.state.offerResignDisabled}
+					className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded border border-border-dim text-text-dim text-xs font-medium hover:border-red-500 hover:text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
 				>
-					<Glyphicon glyph="flag" /> Offer resign
-				</Button>
-			);
-		} else {
-			resignPanel = (
-				<Dropdown id="resignChoice" disabled={this.state.resignChoiceDisabled} className="leftActionButton">
-					<Dropdown.Toggle className={resignDropdownButtonClassName}>
-						<Glyphicon glyph="flag" /> Resign?
-					</Dropdown.Toggle>
-					<Dropdown.Menu>
-						<MenuItem eventKey="1" onClick={this.handleAcceptResign}>Accept</MenuItem>
-						<MenuItem eventKey="2" onClick={this.handleDeclineResign}>Decline</MenuItem>
-					</Dropdown.Menu>
-				</Dropdown>
-			);
-		}
-		if (!this.props.displayDrawChoice) {
-			drawPanel = (
-				<Button
-					bsClass="btn btn-secondary"
-					onClick={this.handleOfferDraw}
-					disabled={this.state.offerDrawDisabled}
-				>
-					<Glyphicon glyph="hand-right" /> Offer draw
-				</Button>
-			);
-		} else {
-			drawPanel = (
-				<Dropdown id="drawChoice" disabled={this.state.drawChoiceDisabled}>
-					<Dropdown.Toggle className={drawDropdownButtonClassName}>
-						<Glyphicon glyph="hand-right" /> Draw?
-					</Dropdown.Toggle>
-					<Dropdown.Menu>
-						<MenuItem eventKey="1" onClick={this.handleAcceptDraw}>Accept</MenuItem>
-						<MenuItem eventKey="2" onClick={this.handleDeclineDraw}>Decline</MenuItem>
-					</Dropdown.Menu>
-				</Dropdown>
+					<i className="fa fa-flag" /> Resign
+				</button>
 			);
 		}
 		return (
-			<div className="gameActionsPanelContainer">
-				{ resignPanel }
-				{ drawPanel }
+			<div className="flex-1 flex flex-col gap-1">
+				<div className={`text-xs font-medium text-red-400 text-center ${!this.state.resignChoiceDisabled ? 'animate-pulse' : ''}`}>
+					Resign offered — accept?
+				</div>
+				<div className="flex gap-1">
+					<button
+						onClick={this.handleAcceptResign}
+						disabled={this.state.resignChoiceDisabled}
+						className="flex-1 py-1 rounded bg-red-600 hover:bg-red-500 text-white text-xs font-medium transition-colors disabled:opacity-40"
+					>
+						Accept
+					</button>
+					<button
+						onClick={this.handleDeclineResign}
+						disabled={this.state.resignChoiceDisabled}
+						className="flex-1 py-1 rounded border border-border-dim text-text-dim hover:text-text-main text-xs font-medium transition-colors disabled:opacity-40"
+					>
+						Decline
+					</button>
+				</div>
+			</div>
+		);
+	}
+
+	renderDrawPanel() {
+		if (!this.props.displayDrawChoice) {
+			return (
+				<button
+					onClick={this.handleOfferDraw}
+					disabled={this.state.offerDrawDisabled}
+					className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded border border-border-dim text-text-dim text-xs font-medium hover:border-accent-blue hover:text-accent-blue transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+				>
+					<i className="fa fa-handshake-o" /> Draw
+				</button>
+			);
+		}
+		return (
+			<div className="flex-1 flex flex-col gap-1">
+				<div className={`text-xs font-medium text-accent-blue text-center ${!this.state.drawChoiceDisabled ? 'animate-pulse' : ''}`}>
+					Draw offered — accept?
+				</div>
+				<div className="flex gap-1">
+					<button
+						onClick={this.handleAcceptDraw}
+						disabled={this.state.drawChoiceDisabled}
+						className="flex-1 py-1 rounded bg-accent-blue hover:bg-blue-400 text-white text-xs font-medium transition-colors disabled:opacity-40"
+					>
+						Accept
+					</button>
+					<button
+						onClick={this.handleDeclineDraw}
+						disabled={this.state.drawChoiceDisabled}
+						className="flex-1 py-1 rounded border border-border-dim text-text-dim hover:text-text-main text-xs font-medium transition-colors disabled:opacity-40"
+					>
+						Decline
+					</button>
+				</div>
+			</div>
+		);
+	}
+
+	render() {
+		return (
+			<div className="flex gap-2 pt-2">
+				{this.renderResignPanel()}
+				{this.renderDrawPanel()}
 			</div>
 		);
 	}
