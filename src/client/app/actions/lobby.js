@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { browserHistory } from 'react-router';
-import { socketLobby, socketLoading } from '../socket';
+import { socketLobby } from '../socket';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -23,7 +23,6 @@ export function updateSelectedGame(game) {
 	return dispatch => {
 		dispatch(updateSelectedGameInternal(game));
 		dispatch(toggleUserWaitingForGameToStart());
-		socketLoading.emit('room', game.id);
 		socketLobby.emit('update game list');
 		browserHistory.push('/loading');
 	};

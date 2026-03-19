@@ -3,7 +3,7 @@ import RouteComponent from '../components/RouteComponent';
 import { clearNotifications, updateResetToken } from '../actions/topLevel';
 import { clearSelectedGame } from '../actions/lobby';
 import { updateIsPlaying, resetGameState } from '../actions/game';
-import { updateSelectedProfile } from '../actions/user';
+import { updateSelectedProfile, updateCurrentUser } from '../actions/user';
 
 function mapStateToProps(state) {
 	return {
@@ -19,7 +19,11 @@ function mapDispatchToProps(dispatch) {
 		updateResetToken: resetToken => dispatch(updateResetToken(resetToken)),
 		clearNotifications: () => dispatch(clearNotifications()),
 		resetGameState: () => dispatch(resetGameState()),
-		clearSelectedGame: () => dispatch(clearSelectedGame())
+		clearSelectedGame: () => dispatch(clearSelectedGame()),
+		setUser: user => {
+			localStorage.setItem('token', user.token || '');
+			dispatch(updateCurrentUser(user));
+		},
 	};
 }
 

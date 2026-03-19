@@ -1,8 +1,11 @@
 import React from 'react';
 import { Router, Route, browserHistory } from 'react-router';
 import _ from 'lodash';
+import axios from 'axios';
 import NotificationSystem from 'react-notification-system';
 import supabase from '../lib/supabaseClient';
+
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
 import AboutComponent from './about/AboutComponent';
 import ResetContainer from '../containers/reset/ResetContainer';
 import RegisterContainer from '../containers/register/RegisterContainer';
@@ -23,6 +26,21 @@ export default class RouteComponent extends React.Component {
 		this.requireGame = this.requireGame.bind(this);
 		this.enterHomeComponent = this.enterHomeComponent.bind(this);
 		this.requireAboutToPlay = this.requireAboutToPlay.bind(this);
+	}
+
+	componentDidMount() {
+		// Restore Supabase session on page load so users stay logged in after refresh
+		supabase.auth.getSession().then(({ data: { session } }) => {
+			if (session && session.access_token) {
+				axios.post(BACKEND + '/api/auth/verify', { token: session.access_token })
+					.then(res => {
+						if (res.data && res.data.user) {
+							this.props.setUser({ ...res.data.user, token: session.access_token });
+						}
+					})
+					.catch(() => {});
+			}
+		}).catch(() => {});
 	}
 
 	shouldComponentUpdate() { return false; }
