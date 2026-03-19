@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { browserHistory } from 'react-router';
 
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+
 export const UPDATE_MOVES = 'UPDATE_MOVES';
 export const UPDATE_CLOCKS = 'UPDATE_CLOCKS';
 export const UPDATE_RESERVES = 'UPDATE_RESERVES';
@@ -40,7 +42,7 @@ export function updateIsPlaying(gameID) {
 	return (dispatch, getState) => {
 		if (getState().game.localMode) { dispatch(receiveIsPlaying(true)); return; }
 		const token = getToken();
-		axios.put('/api/games/userIsPlayingOrObserving/' + gameID, { token },
+		axios.put(BACKEND + '/api/games/userIsPlayingOrObserving/' + gameID, { token },
 			{ validateStatus: s => (s >= 200 && s < 300) || s === 401 || s === 403 })
 			.then(res => dispatch(receiveIsPlaying(res.data.isPlaying)))
 			.catch(() => browserHistory.push('/local'));
@@ -53,14 +55,14 @@ export function getGameInfo(id) {
 		const lobby = getState().lobby;
 		const selectedGame = lobby && lobby.selectedGame;
 		const gameId = (selectedGame && selectedGame.id) || id;
-		axios.put('/api/games/withUsers/' + gameId, { token })
+		axios.put(BACKEND + '/api/games/withUsers/' + gameId, { token })
 			.then(res => dispatch(receiveGameInfo(res.data, res.data.userPosition || 1)));
 	};
 }
 
 export function fetchPostGameData(gameId) {
 	return dispatch => {
-		axios.get('/api/ratings/history?gameId=' + gameId)
+		axios.get(BACKEND + '/api/ratings/history?gameId=' + gameId)
 			.then(res => {
 				const deltas = {};
 				(res.data || []).forEach(row => {

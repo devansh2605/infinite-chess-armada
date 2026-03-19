@@ -3,6 +3,8 @@ import { browserHistory } from 'react-router';
 import axios from 'axios';
 import HeaderContainer from '../containers/header/HeaderContainer';
 
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+
 const PRESETS = [
 	{ label: '1+0', minutes: 1, increment: 0 },
 	{ label: '3+2', minutes: 3, increment: 2 },
@@ -43,7 +45,7 @@ export default class LobbyPage extends Component {
 		if (!(this.props.currentUser && this.props.currentUser.token)) return browserHistory.push('/auth');
 		this.setState({ creating: true, error: '' });
 		try {
-			const { data } = await axios.post('/api/lobby/create',
+			const { data } = await axios.post(`${BACKEND}/api/lobby/create`,
 				{ minutes: this.state.minutes, increment: this.state.increment },
 				{ headers: { Authorization: `Bearer ${this.props.currentUser.token}` } }
 			);
@@ -59,7 +61,7 @@ export default class LobbyPage extends Component {
 		if (!(this.props.currentUser && this.props.currentUser.token)) return browserHistory.push('/auth');
 		this.setState({ joining: true, joinError: '' });
 		try {
-			const { data } = await axios.post('/api/lobby/join',
+			const { data } = await axios.post(`${BACKEND}/api/lobby/join`,
 				{ roomCode: code },
 				{ headers: { Authorization: `Bearer ${this.props.currentUser.token}` } }
 			);

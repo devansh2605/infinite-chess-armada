@@ -1,6 +1,8 @@
 import React from 'react';
 import axios from 'axios';
 import { browserHistory } from 'react-router';
+
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
 import GameSidebarComponent from './sidebar/GameSidebarComponent';
 import GameBoardsContainer from '../../containers/game/boards/GameBoardsContainer';
 import PostGameModal from './PostGameModal';
@@ -26,7 +28,7 @@ export default class GameComponent extends React.Component {
 
 	handleResume() {
 		this.setState({ resuming: true });
-		axios.post('/api/games/resume/' + this.props.gameId)
+		axios.post(BACKEND + '/api/games/resume/' + this.props.gameId)
 			.then(() => browserHistory.replace('/game/' + this.props.gameId))
 			.catch(() => this.setState({ resuming: false }));
 	}

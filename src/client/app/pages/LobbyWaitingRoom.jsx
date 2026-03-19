@@ -49,7 +49,7 @@ export default class LobbyWaitingRoom extends Component {
 		});
 
 		// First get lobby state via REST, then join socket
-		fetch(`/api/lobby/${this.gameId}`)
+		fetch(`${BACKEND}/api/lobby/${this.gameId}`)
 			.then(r => r.json())
 			.then(state => {
 				this.setState({ lobbyState: state });

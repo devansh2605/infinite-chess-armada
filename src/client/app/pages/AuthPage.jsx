@@ -3,6 +3,8 @@ import { browserHistory } from 'react-router';
 import axios from 'axios';
 import supabase from '../lib/supabaseClient';
 
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+
 export default class AuthPage extends Component {
 	constructor(props) {
 		super(props);
@@ -34,7 +36,7 @@ export default class AuthPage extends Component {
 		this.setState({ checkingUsername: true });
 		this._usernameTimeout = setTimeout(async () => {
 			try {
-				const res = await axios.get(`/api/auth/username/${username}`);
+				const res = await axios.get(`${BACKEND}/api/auth/username/${username}`);
 				this.setState({ usernameAvailable: res.data.available, checkingUsername: false });
 			} catch (err) {
 				this.setState({ checkingUsername: false });
@@ -94,7 +96,7 @@ export default class AuthPage extends Component {
 
 	async fetchAndStoreProfile(session) {
 		try {
-			const res = await axios.post('/api/auth/verify', { token: session.access_token });
+			const res = await axios.post(`${BACKEND}/api/auth/verify`, { token: session.access_token });
 			return res.data.user;
 		} catch (err) {
 			return null;
