@@ -41,23 +41,22 @@ export default class LobbyWaitingRoom extends Component {
 			this.setState({ error: msg, starting: false });
 		});
 		this.socket.on('connect', () => {
-			this.socket.emit('join_room', {
-				roomCode: (this.state.lobbyState && this.state.lobbyState.roomCode) || (this.props.params && this.props.params.roomCode),
-				gameId: this.gameId,
-				token: this.token,
-			});
+			// Only emit join_room once we have the roomCode from the REST call
+			if (this._roomCode) {
+				this.socket.emit('join_room', { roomCode: this._roomCode, gameId: this.gameId, token: this.token });
+			}
 		});
 
-		// First get lobby state via REST, then join socket
+		// Fetch lobby state first, then join the socket room with the roomCode
 		fetch(`${BACKEND}/api/lobby/${this.gameId}`)
 			.then(r => r.json())
 			.then(state => {
 				this.setState({ lobbyState: state });
+				this._roomCode = state.roomCode;
 				if (this.socket.connected) {
 					this.socket.emit('join_room', { roomCode: state.roomCode, gameId: this.gameId, token: this.token });
-				} else {
-					this._pendingRoomCode = state.roomCode;
 				}
+				// If not yet connected, the 'connect' handler above will send it once connected
 			})
 			.catch(() => this.setState({ error: 'Failed to load game lobby' }));
 	}

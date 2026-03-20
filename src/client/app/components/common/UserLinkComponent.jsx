@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import './css/userLink.css';
 
 export default function UserLinkComponent(props) {
+	if (!props.user) return null;
 	return (
 		<div>
 			<Link to={`/user/${props.user.username}`}>

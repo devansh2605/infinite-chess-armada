@@ -1,6 +1,8 @@
 import React from 'react';
 import axios from 'axios';
 import _ from 'lodash';
+
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
 import { Chessground } from 'chessground';
 import { browserHistory } from 'react-router';
 import UserLinkComponent from '../../common/UserLinkComponent';
@@ -84,7 +86,7 @@ export default class GameBoardsComponent extends React.Component {
 
 	componentDidMount() {
 		window.addEventListener('navigateToMove', this._onNavigateToMove);
-		socketGame.emit('room', this.props.game.id);
+		socketGame.emit('room', { gameId: this.props.game.id, token: localStorage.getItem('token') });
 
 		// Register tokens for engine moves
 		if (this.props.localMode && this.props.playerTokens) {
@@ -149,11 +151,12 @@ export default class GameBoardsComponent extends React.Component {
 		}
 
 		// Hydrate state
-		axios.get(`/api/games/state/${this.props.game.id}`)
+		axios.get(`${BACKEND}/api/games/state/${this.props.game.id}`)
 			.then(res => {
 				const data = res.data;
+				if (!data || typeof data !== 'object' || !data.leftFens) return; // guard against HTML/invalid response
 				if (data.moves) this.parseAndUpdateMoves(data.moves);
-				this.props.updateReserves(data.leftReserveWhite, data.leftReserveBlack, data.rightReserveWhite, data.rightReserveBlack);
+				this.props.updateReserves(data.leftReserveWhite || [], data.leftReserveBlack || [], data.rightReserveWhite || [], data.rightReserveBlack || []);
 				// Store FEN history for move navigation
 				this.leftFens = data.leftFens;
 				this.rightFens = data.rightFens;
@@ -232,7 +235,7 @@ export default class GameBoardsComponent extends React.Component {
 						viewOnly: true,
 						disableContextMenu: true
 					};
-					const board1Config = this.props.isPlaying ? playingConfig : viewOnlyConfig;
+					const board1Config = playingConfig;
 					if (this.props.userPosition === 1 || this.props.userPosition === 2) {
 						this.board1 = Chessground(document.getElementById('board1'), _.assign({}, leftConfig, board1Config));
 						this.board2 = Chessground(document.getElementById('board2'), _.assign({}, rightConfig, viewOnlyConfig));
@@ -276,6 +279,19 @@ export default class GameBoardsComponent extends React.Component {
 	}
 
 	componentWillReceiveProps(nextProps) {
+		// When isPlaying becomes true (after the userIsPlayingOrObserving API call returns),
+		// update board1 from view-only to interactive. This handles the race condition where
+		// the board was initialized before the API response arrived.
+		if (!this.props.isPlaying && nextProps.isPlaying && !nextProps.localMode && this.board1) {
+			const movableColor = (nextProps.userPosition === 1 || nextProps.userPosition === 3) ? 'white' : 'black';
+			this.board1.set({
+				predroppable: { enabled: true },
+				movable: { color: movableColor },
+				events: { move: this.onDropFromBoard, dropNewPiece: this.onDropFromReserve },
+				viewOnly: false
+			});
+		}
+
 		if (!_.isEmpty(nextProps.pieceToDragFromReserve)) {
 			const mouseEvent = new MouseEvent('click', {
 				bubbles: true,
@@ -383,7 +399,7 @@ export default class GameBoardsComponent extends React.Component {
 				}
 			}
 			const putData = { source, target, piece, userPosition: putUserPosition };
-			axios.put(`/api/games/validate/pawnpromotion/${this.props.game.id}`, putData)
+			axios.put(`${BACKEND}/api/games/validate/pawnpromotion/${this.props.game.id}`, putData)
 				.then(response => {
 					const data = response.data;
 					if (data.valid) {  // promotion is allowed, display popup to select piece
@@ -651,7 +667,7 @@ export default class GameBoardsComponent extends React.Component {
 			if (this.timer3) this.timer3.running = false;
 			if (this.timer4) this.timer4.running = false;
 			const gameId = this.props.game.id;
-			axios.post(`/api/games/pause/${gameId}`)
+			axios.post(`${BACKEND}/api/games/pause/${gameId}`)
 				.catch(() => {})
 				.then(() => {
 					localStorage.setItem(`pausedGame_${gameId}`, JSON.stringify({

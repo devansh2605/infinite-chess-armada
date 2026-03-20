@@ -4,7 +4,8 @@ import ReservePieceGroupComponent from './ReservePieceGroupComponent';
 export default function ReserveComponent(props) {
 	function getPieceNumsFromReserve(reserve) {
 		const pieceNums = { pawn: 0, knight: 0, bishop: 0, rook: 0, queen: 0 };
-		for (const row of props.reserves[reserve]) {
+		const list = (props.reserves && props.reserves[reserve]) || [];
+		for (const row of list) {
 			pieceNums[row.role]++;
 		}
 		return pieceNums;
