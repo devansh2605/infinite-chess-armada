@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { showErrorNotification } from '../util/notifications';
 
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+
 export const REQUEST_LEADERBOARD = 'REQUEST_LEADERBOARD';
 export const RECEIVE_LEADERBOARD = 'RECEIVE_LEADERBOARD';
 
@@ -18,9 +20,13 @@ function shouldFetchLeaderboard(state) {
 
 function fetchLeaderboard() {
 	return dispatch => {
-		dispatch(requestLeaderboard);
-		return axios.get('/api/leaderboard')
-			.then(response => dispatch(receiveLeaderboard(response.data)))
+		dispatch(requestLeaderboard());
+		return axios.get(`${BACKEND}/api/ratings/leaderboard`)
+			.then(response => dispatch(receiveLeaderboard({
+				bullet: response.data,
+				blitz: response.data,
+				classical: response.data
+			})))
 			.catch(() => {
 				showErrorNotification('Failed to fetch leaderboard');
 			});

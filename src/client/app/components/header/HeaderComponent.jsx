@@ -20,7 +20,6 @@ export default function HeaderComponent(props) {
 				<Link to="/local" className="hover:text-text-main transition-colors">Play</Link>
 				<Link to="/leaderboard" className="hover:text-text-main transition-colors">Leaderboard</Link>
 				<Link to="/history" className="hover:text-text-main transition-colors">History</Link>
-				<Link to="/about" className="hover:text-text-main transition-colors">About</Link>
 			</nav>
 			<div className="flex items-center gap-4 text-sm">
 				{props.isLoggedIn ? (

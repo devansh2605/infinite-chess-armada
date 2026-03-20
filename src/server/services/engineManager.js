@@ -235,71 +235,81 @@ module.exports = {
 	async triggerEngineMoves(gameId, socket, gameSocket, clearRoom, updateGame, playerTokens) {
 		const game = gameStore[gameId];
 		if (!game) return;
+		// Prevent duplicate concurrent triggers — only one engine loop per game at a time
+		if (game.triggerRunning) return;
+		game.triggerRunning = true;
 
 		try {
-			const row = await Game.getByID(gameId);
-			if (row.status !== 'playing') return;
+			// Iterative loop replaces recursion; avoids deep stacks and keeps the
+			// triggerRunning guard active for the full duration of the engine's turn.
+			while (true) {
+				if (!gameStore[gameId]) break;
+				const row = await Game.getByID(gameId);
+				if (row.status !== 'playing') break;
 
-			const lrw = row.left_reserve_white  ? JSON.parse(row.left_reserve_white)  : [];
-			const lrb = row.left_reserve_black  ? JSON.parse(row.left_reserve_black)  : [];
+				const lrw = row.left_reserve_white  ? JSON.parse(row.left_reserve_white)  : [];
+				const lrb = row.left_reserve_black  ? JSON.parse(row.left_reserve_black)  : [];
 
-			// Check left board (players 1 and 2)
-			if (!game.drawnBoards[1]) {
-				const leftTurn = row.left_color_to_play;
-				const leftPlayer = leftTurn === 'white' ? 1 : 2;
-				if (game.enginePlayers[leftPlayer]) {
-					const fen = row.left_fens.split(',').pop();
-					const availablePieces = leftTurn === 'white' ? lrw : lrb;
-					const engine = await this.getEngine(gameId, 1);
+				// Check left board (players 1 and 2)
+				if (!game.drawnBoards[1]) {
+					const leftTurn = row.left_color_to_play;
+					const leftPlayer = leftTurn === 'white' ? 1 : 2;
+					if (game.enginePlayers[leftPlayer]) {
+						const fen = row.left_fens.split(',').pop();
+						const availablePieces = leftTurn === 'white' ? lrw : lrb;
+						const engine = await this.getEngine(gameId, 1);
 
-					// Fetch partner board state for coupling
-					const rrw = row.right_reserve_white ? JSON.parse(row.right_reserve_white) : [];
-					const rrb = row.right_reserve_black ? JSON.parse(row.right_reserve_black) : [];
-					const rightFen = row.right_fens.split(',').pop();
+						const rrw = row.right_reserve_white ? JSON.parse(row.right_reserve_white) : [];
+						const rrb = row.right_reserve_black ? JSON.parse(row.right_reserve_black) : [];
+						const rightFen = row.right_fens.split(',').pop();
 
-					const moveData = await this._getBestMoveData(
-						fen, availablePieces, lrw, lrb, engine, gameId, leftPlayer, playerTokens,
-						{ otherBoardFen: rightFen, otherReserveWhite: rrw, otherReserveBlack: rrb }
-					);
-					if (moveData) {
-						await updateGame(moveData, socket, gameSocket, clearRoom);
-						await new Promise(resolve => setTimeout(resolve, 200));
-						return this.triggerEngineMoves(gameId, socket, gameSocket, clearRoom, updateGame, playerTokens);
+						const moveData = await this._getBestMoveData(
+							fen, availablePieces, lrw, lrb, engine, gameId, leftPlayer, playerTokens,
+							{ otherBoardFen: rightFen, otherReserveWhite: rrw, otherReserveBlack: rrb }
+						);
+						if (moveData) {
+							await updateGame(moveData, socket, gameSocket, clearRoom);
+							await new Promise(resolve => setTimeout(resolve, 200));
+							continue; // restart loop to check next engine turn
+						}
 					}
 				}
-			}
 
-			// Check right board (players 3 and 4) — re-fetch to pick up reserve changes
-			if (!game.drawnBoards[2]) {
-				const row2 = await Game.getByID(gameId);
-				if (row2.status !== 'playing') return;
-				const rightTurn = row2.right_color_to_play;
-				const rightPlayer = rightTurn === 'white' ? 3 : 4;
-				if (game.enginePlayers[rightPlayer]) {
-					const fen = row2.right_fens.split(',').pop();
-					const rrw = row2.right_reserve_white ? JSON.parse(row2.right_reserve_white) : [];
-					const rrb = row2.right_reserve_black ? JSON.parse(row2.right_reserve_black) : [];
-					const availablePieces = rightTurn === 'white' ? rrw : rrb;
-					const engine = await this.getEngine(gameId, 2);
+				// Check right board (players 3 and 4) — re-fetch to pick up reserve changes
+				if (!game.drawnBoards[2]) {
+					const row2 = await Game.getByID(gameId);
+					if (row2.status !== 'playing') break;
+					const rightTurn = row2.right_color_to_play;
+					const rightPlayer = rightTurn === 'white' ? 3 : 4;
+					if (game.enginePlayers[rightPlayer]) {
+						const fen = row2.right_fens.split(',').pop();
+						const rrw = row2.right_reserve_white ? JSON.parse(row2.right_reserve_white) : [];
+						const rrb = row2.right_reserve_black ? JSON.parse(row2.right_reserve_black) : [];
+						const availablePieces = rightTurn === 'white' ? rrw : rrb;
+						const engine = await this.getEngine(gameId, 2);
 
-					// Fetch partner board state for coupling
-					const lrw2 = row2.left_reserve_white ? JSON.parse(row2.left_reserve_white) : [];
-					const lrb2 = row2.left_reserve_black ? JSON.parse(row2.left_reserve_black) : [];
-					const leftFen = row2.left_fens.split(',').pop();
+						const lrw2 = row2.left_reserve_white ? JSON.parse(row2.left_reserve_white) : [];
+						const lrb2 = row2.left_reserve_black ? JSON.parse(row2.left_reserve_black) : [];
+						const leftFen = row2.left_fens.split(',').pop();
 
-					const moveData = await this._getBestMoveData(
-						fen, availablePieces, rrw, rrb, engine, gameId, rightPlayer, playerTokens,
-						{ otherBoardFen: leftFen, otherReserveWhite: lrw2, otherReserveBlack: lrb2 }
-					);
-					if (moveData) {
-						await updateGame(moveData, socket, gameSocket, clearRoom);
-						await new Promise(resolve => setTimeout(resolve, 200));
-						return this.triggerEngineMoves(gameId, socket, gameSocket, clearRoom, updateGame, playerTokens);
+						const moveData = await this._getBestMoveData(
+							fen, availablePieces, rrw, rrb, engine, gameId, rightPlayer, playerTokens,
+							{ otherBoardFen: leftFen, otherReserveWhite: lrw2, otherReserveBlack: lrb2 }
+						);
+						if (moveData) {
+							await updateGame(moveData, socket, gameSocket, clearRoom);
+							await new Promise(resolve => setTimeout(resolve, 200));
+							continue;
+						}
 					}
 				}
+
+				break; // no engine moves needed
 			}
 		} catch (err) {
 			logger.error(`Engine move error for game ${gameId}: ${err}`);
+		} finally {
+			if (gameStore[gameId]) gameStore[gameId].triggerRunning = false;
 		}
 	},
 

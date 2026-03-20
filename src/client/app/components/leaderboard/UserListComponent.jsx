@@ -11,6 +11,7 @@ export default function UserListComponent(props) {
 				<tr className="border-b border-border-dim text-xs uppercase tracking-wide">
 					<th className="text-left pb-2 w-8">#</th>
 					<th className="text-left pb-2">Player</th>
+					<th className="text-right pb-2 pr-6">Games</th>
 					<th className="text-right pb-2">Rating</th>
 				</tr>
 			</thead>
@@ -26,6 +27,7 @@ export default function UserListComponent(props) {
 								<UserLinkComponent user={user} />
 							</div>
 						</td>
+						<td className="py-2 pr-6 text-right text-xs">{user.games_played || 0}</td>
 						<td className="py-2 text-right">
 							<span className="bg-bg-panel px-2 py-0.5 rounded text-text-main font-medium">
 								{Math.round(user.rating)}

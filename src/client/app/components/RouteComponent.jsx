@@ -6,7 +6,6 @@ import NotificationSystem from 'react-notification-system';
 import supabase from '../lib/supabaseClient';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
-import AboutComponent from './about/AboutComponent';
 import ResetContainer from '../containers/reset/ResetContainer';
 import RegisterContainer from '../containers/register/RegisterContainer';
 import LeaderboardContainer from '../containers/leaderboard/LeaderboardContainer';
@@ -84,7 +83,6 @@ export default class RouteComponent extends React.Component {
 					<Route path="/auth" component={AuthContainer} />
 					<Route path="/local" component={LobbyContainerPage} onEnter={this.enterHomeComponent} />
 					<Route path="/lobby/*" component={LobbyWaitingRoomContainer} />
-					<Route path="/about" component={AboutComponent} />
 					<Route path="/user/*" component={ProfileContainer} onEnter={this.requireProfileUser} />
 					<Route path="/register" component={RegisterContainer} />
 					<Route path="/reset/*" component={ResetContainer} onEnter={this.requireResetToken} />

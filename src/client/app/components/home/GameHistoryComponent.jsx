@@ -2,6 +2,8 @@ import React from 'react';
 import axios from 'axios';
 import HeaderContainer from '../../containers/header/HeaderContainer';
 
+const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+
 export default class GameHistoryComponent extends React.Component {
 	constructor(props) {
 		super(props);
@@ -9,7 +11,7 @@ export default class GameHistoryComponent extends React.Component {
 	}
 
 	componentDidMount() {
-		axios.get('/api/games/history')
+		axios.get(`${BACKEND}/api/games/history`)
 			.then(res => this.setState({ games: res.data, loading: false }))
 			.catch(() => this.setState({ loading: false }));
 	}
@@ -23,54 +25,73 @@ export default class GameHistoryComponent extends React.Component {
 			return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 		}
 
-		function resultLabel(termination) {
-			if (!termination) return <span className="text-text-dim">—</span>;
-			if (termination.includes('Team 1')) return <span className="text-accent font-medium">Team 1</span>;
-			if (termination.includes('Team 2')) return <span className="text-accent-blue font-medium">Team 2</span>;
-			return <span className="text-text-dim">Draw</span>;
+		function deltaDisplay(delta) {
+			if (delta == null) return null;
+			const rounded = Math.round(delta);
+			if (rounded > 0) return <span className="text-green-400 text-xs font-medium ml-1">+{rounded}</span>;
+			if (rounded < 0) return <span className="text-red-400 text-xs font-medium ml-1">{rounded}</span>;
+			return <span className="text-text-dim text-xs ml-1">±0</span>;
+		}
+
+		function playerCell(name, ratingInfo) {
+			if (!name) return <span className="text-text-dim italic text-sm">Engine</span>;
+			const delta = ratingInfo ? ratingInfo.rating_after - ratingInfo.rating_before : null;
+			return (
+				<span className="flex items-center">
+					<span className="text-text-main text-sm">{name}</span>
+					{deltaDisplay(delta)}
+				</span>
+			);
 		}
 
 		const content = (
-			<div className={showHeader ? 'px-6 py-8 bg-bg-base min-h-screen' : ''}>
+			<div>
 				{showHeader && <h2 className="text-text-main text-xl font-semibold mb-4">Game History</h2>}
 				{loading ? (
 					<p className="text-text-dim text-sm">Loading...</p>
 				) : games.length === 0 ? (
 					<p className="text-text-dim text-sm">No completed games yet.</p>
 				) : (
-					<div className="overflow-x-auto">
-						<table className="w-full text-sm text-text-dim">
-							<thead>
-								<tr className="border-b border-border-dim text-xs uppercase tracking-wide">
-									<th className="text-left pb-2 pr-4">Date</th>
-									<th className="text-left pb-2 pr-4">Time</th>
-									<th className="text-left pb-2 pr-4">Mode</th>
-									<th className="text-left pb-2 pr-4">Team 1 (P1+P4)</th>
-									<th className="text-left pb-2 pr-4">Team 2 (P2+P3)</th>
-									<th className="text-left pb-2">Result</th>
-								</tr>
-							</thead>
-							<tbody>
-								{games.map(g => (
-									<tr key={g.id} className="border-b border-border-dim hover:bg-bg-hover transition-colors">
-										<td className="py-2 pr-4">{formatDate(g.timestamp)}</td>
-										<td className="py-2 pr-4 text-text-main font-medium">{g.minutes}+{g.increment}</td>
-										<td className="py-2 pr-4">
-											<span className={`px-1.5 py-0.5 rounded text-xs font-medium ${g.mode === 'Rated' ? 'bg-accent-blue/20 text-accent-blue' : 'bg-bg-panel text-text-dim'}`}>
-												{g.mode}
-											</span>
-										</td>
-										<td className="py-2 pr-4 text-text-main">
-											{g.p1} <span className="text-text-dim">&amp;</span> {g.p4}
-										</td>
-										<td className="py-2 pr-4 text-text-main">
-											{g.p2} <span className="text-text-dim">&amp;</span> {g.p3}
-										</td>
-										<td className="py-2">{resultLabel(g.termination)}</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
+					<div className="space-y-3">
+						{games.map(g => {
+							const r = g.ratings || {};
+							const team1Won = g.termination && g.termination.includes('Team 1');
+							const team2Won = g.termination && g.termination.includes('Team 2');
+							return (
+								<div key={g.id} className="bg-bg-card border border-border-dim rounded-xl p-4">
+									<div className="flex items-start justify-between gap-4">
+										<div className="flex-1 min-w-0 space-y-2">
+											<div className="flex items-center gap-2">
+												<span className={`text-xs px-2 py-0.5 rounded font-semibold flex-shrink-0 ${team1Won ? 'bg-accent/20 text-accent' : 'bg-bg-panel text-text-dim'}`}>
+													{team1Won ? 'W' : 'L'} Team 1
+												</span>
+												<div className="flex flex-col gap-0.5">
+													{playerCell(g.p1, r[1])}
+													{playerCell(g.p4, r[4])}
+												</div>
+											</div>
+											<div className="flex items-center gap-2">
+												<span className={`text-xs px-2 py-0.5 rounded font-semibold flex-shrink-0 ${team2Won ? 'bg-accent-blue/20 text-accent-blue' : 'bg-bg-panel text-text-dim'}`}>
+													{team2Won ? 'W' : 'L'} Team 2
+												</span>
+												<div className="flex flex-col gap-0.5">
+													{playerCell(g.p2, r[2])}
+													{playerCell(g.p3, r[3])}
+												</div>
+											</div>
+										</div>
+										<div className="text-right flex-shrink-0 space-y-1">
+											<div className="text-text-main text-sm font-semibold">{g.minutes}+{g.increment}</div>
+											<span className={`text-xs px-1.5 py-0.5 rounded inline-block ${g.mode === 'Rated' ? 'bg-accent-blue/20 text-accent-blue' : 'bg-bg-panel text-text-dim'}`}>{g.mode || 'Rated'}</span>
+											<div className="text-text-dim text-xs">{formatDate(g.created_at)}</div>
+										</div>
+									</div>
+									{g.termination && (
+										<div className="mt-2 pt-2 border-t border-border-dim text-xs text-text-dim">{g.termination}</div>
+									)}
+								</div>
+							);
+						})}
 					</div>
 				)}
 			</div>
@@ -81,7 +102,7 @@ export default class GameHistoryComponent extends React.Component {
 		return (
 			<div className="bg-bg-base min-h-screen">
 				<HeaderContainer />
-				{content}
+				<div className="max-w-3xl mx-auto px-6 py-8">{content}</div>
 			</div>
 		);
 	}

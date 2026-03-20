@@ -27,7 +27,16 @@ export default class LobbyPage extends Component {
 			joining: false,
 			error: '',
 			joinError: '',
+			pausedGames: [],
 		};
+	}
+
+	componentDidMount() {
+		if (this.props.currentUser && this.props.currentUser.token) {
+			axios.get(`${BACKEND}/api/games/paused`)
+				.then(res => this.setState({ pausedGames: res.data || [] }))
+				.catch(() => {});
+		}
 	}
 
 	handlePreset(p) {
@@ -55,6 +64,15 @@ export default class LobbyPage extends Component {
 		}
 	}
 
+	async resumeGame(gameId) {
+		try {
+			await axios.post(`${BACKEND}/api/games/resume/${gameId}`);
+			browserHistory.push(`/game/${gameId}`);
+		} catch (err) {
+			this.setState({ error: 'Failed to resume game' });
+		}
+	}
+
 	async joinGame() {
 		const code = this.state.joinCode.trim().toUpperCase();
 		if (!code || code.length !== 6) return this.setState({ joinError: 'Enter a 6-character room code' });
@@ -72,7 +90,9 @@ export default class LobbyPage extends Component {
 	}
 
 	render() {
-		const { preset, customMinutes, customIncrement, joinCode, creating, joining, error, joinError } = this.state;
+		const { preset, customMinutes, customIncrement, joinCode, creating, joining, error, joinError, pausedGames } = this.state;
+		const username = this.props.currentUser && this.props.currentUser.username;
+		const myPausedGames = pausedGames.filter(g => g.p1 === username || g.p2 === username || g.p3 === username || g.p4 === username);
 		const isCustom = preset === 'Custom';
 
 		return (
@@ -169,12 +189,35 @@ export default class LobbyPage extends Component {
 						</div>
 					</div>
 
-					{/* Recent/paused games could go here in the future */}
-					<div className="mt-10 text-center">
+					<div className="mt-8 text-center">
 						<p className="text-text-dim text-sm">
 							Your rating: <span className="text-accent font-bold text-lg">{(this.props.currentUser && this.props.currentUser.rating) || 1500}</span>
 						</p>
 					</div>
+
+					{myPausedGames.length > 0 && (
+						<div className="mt-8">
+							<h2 className="text-text-main font-semibold text-lg mb-3">Paused Games</h2>
+							<div className="space-y-3">
+								{myPausedGames.map(g => (
+									<div key={g.id} className="bg-bg-card border border-border-dim rounded-xl p-4 flex items-center justify-between">
+										<div>
+											<div className="text-text-main text-sm font-medium mb-1">
+												{g.p1 || 'Engine'} &amp; {g.p4 || 'Engine'} <span className="text-text-dim">vs</span> {g.p2 || 'Engine'} &amp; {g.p3 || 'Engine'}
+											</div>
+											<div className="text-text-dim text-xs">{g.minutes}+{g.increment} · {g.mode || 'Rated'}</div>
+										</div>
+										<button
+											onClick={() => this.resumeGame(g.id)}
+											className="bg-accent hover:bg-orange-400 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors flex-shrink-0"
+										>
+											Resume
+										</button>
+									</div>
+								))}
+							</div>
+						</div>
+					)}
 				</div>
 			</div>
 		);

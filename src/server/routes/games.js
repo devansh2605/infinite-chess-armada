@@ -169,6 +169,21 @@ router.put('/validate/pawnpromotion/:id', async (req, res) => {
 router.get('/history', async (_req, res) => {
 	try {
 		const games = await Game.getRecentCompleted(30);
+		if (games.length > 0) {
+			const gameIds = games.map(g => g.id);
+			const { data: ratingData } = await supabase
+				.from('rating_history')
+				.select('game_id, slot, rating_before, rating_after, result')
+				.in('game_id', gameIds);
+			if (ratingData) {
+				const byGame = {};
+				for (const r of ratingData) {
+					if (!byGame[r.game_id]) byGame[r.game_id] = {};
+					byGame[r.game_id][r.slot] = r;
+				}
+				for (const g of games) g.ratings = byGame[g.id] || {};
+			}
+		}
 		res.json(games);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to fetch game history' });

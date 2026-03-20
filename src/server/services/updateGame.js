@@ -2,6 +2,19 @@ const Game = require('../models/Game');
 const Bug = require('./bug');
 const supabase = require('../lib/supabaseAdmin');
 
+// Per-game async mutex: prevents concurrent read-modify-write races
+// (board shuffling / can't-move bugs caused by engine + human moves overlapping)
+const gameLocks = {};
+
+async function acquireGameLock(gameId) {
+	let releaseLock;
+	const lockPromise = new Promise(resolve => { releaseLock = resolve; });
+	const prev = gameLocks[gameId] || Promise.resolve();
+	gameLocks[gameId] = prev.then(() => lockPromise);
+	await prev;
+	return releaseLock;
+}
+
 function newMoveString(moves, userPosition, game) {
 	if (!moves) moves = '';
 	let moveCount;
@@ -40,6 +53,7 @@ function convertPieceToSANLetter(piece) {
 }
 
 module.exports = async (data, socket, gameSocket, clearRoom) => {
+	const releaseLock = await acquireGameLock(data.id);
 	try {
 		const row = await Game.getByID(data.id);
 		const currentTime = Date.now();
@@ -181,5 +195,7 @@ module.exports = async (data, socket, gameSocket, clearRoom) => {
 		}
 	} catch (err) {
 		socket.emit('snapback move', { fen: null });
+	} finally {
+		releaseLock();
 	}
 };
