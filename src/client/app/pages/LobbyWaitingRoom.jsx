@@ -49,8 +49,17 @@ export default class LobbyWaitingRoom extends Component {
 
 		// Fetch lobby state first, then join the socket room with the roomCode
 		fetch(`${BACKEND}/api/lobby/${this.gameId}`)
-			.then(r => r.json())
+			.then(r => {
+				if (r.status === 400) {
+					// Game already started — go straight to the game page
+					browserHistory.push(`/game/${this.gameId}`);
+					return null;
+				}
+				if (!r.ok) throw new Error('Failed to load game lobby');
+				return r.json();
+			})
 			.then(state => {
+				if (!state) return; // redirected
 				this.setState({ lobbyState: state });
 				this._roomCode = state.roomCode;
 				if (this.socket.connected) {

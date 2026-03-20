@@ -205,7 +205,10 @@ module.exports = {
 	async getEngine(gameId, boardNum) {
 		const game = gameStore[gameId];
 		if (!game) return null;
-		if (!game.engines[boardNum]) {
+		if (!game.engines[boardNum] || !game.engines[boardNum].started) {
+			if (game.engines[boardNum]) {
+				try { game.engines[boardNum].quit(); } catch (e) { /* ignore */ }
+			}
 			const boardPlayers = boardNum === 1 ? [1, 2] : [3, 4];
 			const enginePlayer = boardPlayers.find(p => game.enginePlayers[p]);
 			const skillLevel = enginePlayer ? (game.engineSkillLevels[enginePlayer] || 5) : 5;
