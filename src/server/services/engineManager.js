@@ -213,7 +213,13 @@ module.exports = {
 			const enginePlayer = boardPlayers.find(p => game.enginePlayers[p]);
 			const skillLevel = enginePlayer ? (game.engineSkillLevels[enginePlayer] || 5) : 5;
 			game.engines[boardNum] = new StockfishEngine(skillLevel);
-			await game.engines[boardNum].start();
+			try {
+				await game.engines[boardNum].start();
+			} catch (err) {
+				logger.error(`Stockfish failed to start (board ${boardNum}): ${err}`);
+				game.engines[boardNum] = null;
+				return null;
+			}
 		}
 		return game.engines[boardNum];
 	},
@@ -310,6 +316,21 @@ module.exports = {
 	 *   6. Apply team capture bonus to board move score
 	 *   7. Select best overall move
 	 */
+	_randomLegalMoveData(fen, reserveWhite, reserveBlack, gameId, userPosition, playerTokens) {
+		try {
+			const g = new Bug(fen);
+			g.setReserves(reserveWhite.slice(), reserveBlack.slice());
+			const legalMoves = g.moves({ verbose: true });
+			if (!legalMoves || legalMoves.length === 0) return null;
+			const m = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+			const uciMove = m.from + m.to + (m.promotion || '');
+			return this._buildMoveData(uciMove, fen, gameId, userPosition, playerTokens);
+		} catch (e) {
+			logger.error(`Random move fallback failed: ${e}`);
+			return null;
+		}
+	},
+
 	async _getBestMoveData(fen, availablePieces, reserveWhite, reserveBlack, engine, gameId, userPosition, playerTokens, partnerBoardInfo) {
 		const teamInfo = getTeamInfo(userPosition);
 
@@ -327,6 +348,12 @@ module.exports = {
 			if (forcedCandidates.length > 0) {
 				return this._buildDropMoveData(forcedCandidates[0].drop, fen, gameId, userPosition, playerTokens);
 			}
+		}
+
+		// If no Stockfish engine available, fall back to a random legal move
+		if (!engine) {
+			logger.error(`No Stockfish engine for game ${gameId} pos ${userPosition} — using random move`);
+			return this._randomLegalMoveData(fen, reserveWhite, reserveBlack, gameId, userPosition, playerTokens);
 		}
 
 		// 2. Compute partner coupling signals
@@ -352,7 +379,13 @@ module.exports = {
 		}
 
 		// 3. Stockfish board move
-		const uciMove = await engine.getBestMove(fen, 250);
+		let uciMove;
+		try {
+			uciMove = await engine.getBestMove(fen, 250);
+		} catch (e) {
+			logger.error(`Stockfish getBestMove failed: ${e} — using random move`);
+			return this._randomLegalMoveData(fen, reserveWhite, reserveBlack, gameId, userPosition, playerTokens);
+		}
 		const normalFen = uciMove && uciMove !== '(none)' ? this._applyUciMove(fen, uciMove) : null;
 
 		// If no reserve pieces, just play the board move

@@ -2,7 +2,7 @@ const { spawn } = require('child_process');
 const logger = require('../logger');
 
 const STOCKFISH_PATH = process.env.STOCKFISH_PATH ||
-	(process.platform === 'darwin' ? '/opt/homebrew/bin/stockfish' : 'stockfish');
+	(process.platform === 'darwin' ? '/opt/homebrew/bin/stockfish' : '/usr/bin/stockfish');
 
 class StockfishEngine {
 	constructor(skillLevel = 10) {
