@@ -227,7 +227,7 @@ module.exports = {
 	cleanupGame(gameId) {
 		const game = gameStore[gameId];
 		if (game) {
-			Object.values(game.engines).forEach(engine => engine.quit());
+			Object.values(game.engines).forEach(engine => { if (engine) engine.quit(); });
 			delete gameStore[gameId];
 		}
 	},
@@ -320,11 +320,39 @@ module.exports = {
 		try {
 			const g = new Bug(fen);
 			g.setReserves(reserveWhite.slice(), reserveBlack.slice());
-			const legalMoves = g.moves({ verbose: true });
-			if (!legalMoves || legalMoves.length === 0) return null;
-			const m = legalMoves[Math.floor(Math.random() * legalMoves.length)];
-			const uciMove = m.from + m.to + (m.promotion || '');
-			return this._buildMoveData(uciMove, fen, gameId, userPosition, playerTokens);
+			// Use SAN strings — verbose moves have 0x88 internal coords, not algebraic
+			const sanMoves = g.moves();
+			if (!sanMoves || sanMoves.length === 0) return null;
+			const san = sanMoves[Math.floor(Math.random() * sanMoves.length)];
+
+			// Drop move (format: "N@f3")
+			if (san.includes('@')) {
+				const pieceType = san[0].toLowerCase();
+				const square = san.slice(2, 4);
+				const turnColor = fen.split(' ')[1] === 'w' ? 'white' : 'black';
+				return {
+					id: gameId, userPosition,
+					move: { source: 'spare', target: square, piece: { color: turnColor, role: ROLE_MAP[pieceType] }, promotion: null },
+					token: playerTokens[`player${userPosition}Token`]
+				};
+			}
+
+			// Board move: apply SAN to get move object, then convert 0x88 coords to algebraic
+			const g2 = new Bug(fen);
+			g2.setReserves(reserveWhite.slice(), reserveBlack.slice());
+			const result = g2.move(san);
+			if (!result) return null;
+			// Bug.js make_pretty leaves from/to as 0x88 internal numbers
+			const toAlg = i => 'abcdefgh'[i & 7] + '87654321'[i >> 4];
+			const source = toAlg(result.from);
+			const target = toAlg(result.to);
+			const piece = getPieceFromFen(fen, source);
+			if (!piece) return null;
+			return {
+				id: gameId, userPosition,
+				move: { source, target, piece, promotion: result.promotion || null },
+				token: playerTokens[`player${userPosition}Token`]
+			};
 		} catch (e) {
 			logger.error(`Random move fallback failed: ${e}`);
 			return null;
